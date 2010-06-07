@@ -52,6 +52,13 @@ Any parameters with a nil values are ignored."
     params "&")))
 
 
+;;; Bindings
+
+(define-prefix-command 'magithub-prefix 'magithub-map)
+(define-key magithub-map (kbd "C") 'magithub-create-from-local)
+(define-key magit-mode-map (kbd "'") 'magithub-prefix)
+
+
 ;;; Requests
 
 (defun magit-request-url (path)
