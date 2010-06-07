@@ -117,10 +117,19 @@ Like `url-retrieve', except for the following:
 Like `url-retrieve-synchronously', except for the following:
 * PATH is an API resource path, not a full URL.
 * GitHub authorization is automatically enabled.
-* `magithub-request-data' is used instead of `url-request-data'."
+* `magithub-request-data' is used instead of `url-request-data'.
+* Returns a decoded JSON object (as a plist) rather than a buffer
+  containing the response."
   (magithub-with-auth
     (let ((url-request-data (magithub-make-query-string magithub-request-data)))
-      (url-retrieve-synchronously (magit-request-url path)))))
+      (with-current-buffer (url-retrieve-synchronously (magit-request-url path))
+        (goto-char (point-min))
+        (search-forward "\n\n" nil t) ; Move past headers
+        (let* ((data (let ((json-object-type 'plist)) (json-read)))
+               (err (plist-get data :error)))
+          (when err (error "GitHub error: %s" err))
+          (kill-buffer)
+          data)))))
 
 
 ;;; Configuration
