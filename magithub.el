@@ -20,6 +20,10 @@
 
 (require 'magit)
 (require 'url)
+(eval-when-compile (require 'cl))
+
+
+;;; Variables
 
 (defvar magithub-api-base "https://github.com/api/v2/json/"
   "The base URL for accessing the GitHub API.")
@@ -27,18 +31,28 @@
 (defvar magithub-request-data nil
   "An assoc list of parameter names to values.
 
-This is meant to be dynamicall bound around `magithub-retrieve-synchronously'.")
+This is meant to be dynamically bound around `magithub-retrieve'
+and `magithub-retrieve-synchronously'.")
+
 
 ;;; Utilities
 
 (defun magithub-make-query-string (params)
   "Return a query string constructed from PARAMS.
-PARAMS is an assoc list of parameter names to values."
-  (mapconcat
-   (lambda (param)
-     (concat (url-hexify-string (car param)) "="
-             (url-hexify-string (cdr param))))
-   params "&"))
+PARAMS is an assoc list of parameter names to values.
+
+Any parameters with a nil values are ignored."
+  (replace-regexp-in-string
+   "&+" "&"
+   (mapconcat
+    (lambda (param)
+      (when (cdr param)
+        (concat (url-hexify-string (car param)) "="
+                (url-hexify-string (cdr param)))))
+    params "&")))
+
+
+;;; Requests
 
 (defun magit-request-url (path)
   "Return the full GitHub URL for the resource PATH.
@@ -61,6 +75,22 @@ If `url-request-method' is GET, the returned URL will include
                                            magithub-request-data)))
        ,@body)))
 
+(defun magithub-handle-errors (status)
+  "Handle any errors reported in a `url-retrieve' callback.
+STATUS is the first argument passed to the callback.
+
+If there is an error and GitHub returns an error message, that
+message is printed with `error'.  Otherwise, the HTTP error is
+signaled."
+  (loop for (name val) on status by 'cddr
+        do (when (eq name :error)
+             (condition-case err
+                 (let* ((data (json-read))
+                        (err (cdr (assoc 'error data))))
+                   (unless err (signal 'json-readtable-error nil))
+                   (error "GitHub error: %s" err))
+               (json-readtable-error (signal (car val) (cdr val)))))))
+
 (defun magithub-retrieve (path callback &optional cbargs)
   "Retrieve GitHub API PATH asynchronously.
 Call CALLBACK with CBARGS when finished.
@@ -68,10 +98,17 @@ Call CALLBACK with CBARGS when finished.
 Like `url-retrieve', except for the following:
 * PATH is an API resource path, not a full URL.
 * GitHub authorization is automatically enabled.
-* `magithub-request-data' is used instead of `url-request-data'."
+* `magithub-request-data' is used instead of `url-request-data'.
+* CALLBACK is passed a decoded JSON object rather than a list of
+  statuses.  Basic error handling is done by `magithub-retrieve'."
   (magithub-with-auth
-    (let (url-request-data (magithub-make-query-string magithub-request-data))
-      (url-retrieve (magit-request-url path) callback cbargs))))
+    (let ((url-request-data (magithub-make-query-string magithub-request-data)))
+      (url-retrieve (magit-request-url path)
+                    (lambda (status callback &rest cbargs)
+                      (search-forward "\n\n" nil t) ; Move past headers
+                      (magithub-handle-errors status)
+                      (apply callback (json-read) cbargs))
+                    (cons callback cbargs)))))
 
 (defun magithub-retrieve-synchronously (path)
   "Retrieve GitHub API PATH synchronously.
