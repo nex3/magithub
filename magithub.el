@@ -85,8 +85,9 @@ signaled."
   (loop for (name val) on status by 'cddr
         do (when (eq name :error)
              (condition-case err
-                 (let* ((data (json-read))
-                        (err (cdr (assoc 'error data))))
+                 (let* ((json-object-type 'plist)
+                        (data (json-read))
+                        (err (plist-get data :error)))
                    (unless err (signal 'json-readtable-error nil))
                    (error "GitHub error: %s" err))
                (json-readtable-error (signal (car val) (cdr val)))))))
@@ -99,15 +100,15 @@ Like `url-retrieve', except for the following:
 * PATH is an API resource path, not a full URL.
 * GitHub authorization is automatically enabled.
 * `magithub-request-data' is used instead of `url-request-data'.
-* CALLBACK is passed a decoded JSON object rather than a list of
-  statuses.  Basic error handling is done by `magithub-retrieve'."
+* CALLBACK is passed a decoded JSON object (as a plist) rather
+  than a list of statuses.  Basic error handling is done by `magithub-retrieve'."
   (magithub-with-auth
     (let ((url-request-data (magithub-make-query-string magithub-request-data)))
       (url-retrieve (magit-request-url path)
                     (lambda (status callback &rest cbargs)
                       (search-forward "\n\n" nil t) ; Move past headers
                       (magithub-handle-errors status)
-                      (apply callback (json-read) cbargs))
+                      (apply callback (let ((json-object-type 'plist)) (json-read)) cbargs))
                     (cons callback cbargs)))))
 
 (defun magithub-retrieve-synchronously (path)
