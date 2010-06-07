@@ -40,6 +40,39 @@ PARAMS is an assoc list of parameter names to values."
              (url-hexify-string (cdr param))))
    params "&"))
 
+(defun magit-request-url (path)
+  "Return the full GitHub URL for the resource PATH.
+
+If `url-request-method' is GET, the returned URL will include
+`url-request-data' as the query string."
+  (concat magithub-api-base path
+          (if (string= url-request-method "GET")
+              (concat "?" url-request-data)
+            "")))
+
+(defmacro magithub-with-auth (&rest body)
+  "Runs BODY with GitHub authorization info in `magithub-request-data'."
+  (declare (indent 0))
+  (let ((auth (gensym)))
+    `(let* ((,auth (magithub-auth-info))
+            (magithub-request-data (append (list
+                                            (cons "login" (car ,auth))
+                                            (cons "token" (cdr ,auth)))
+                                           magithub-request-data)))
+       ,@body)))
+
+(defun magithub-retrieve (path callback &optional cbargs)
+  "Retrieve GitHub API PATH asynchronously.
+Call CALLBACK with CBARGS when finished.
+
+Like `url-retrieve', except for the following:
+* PATH is an API resource path, not a full URL.
+* GitHub authorization is automatically enabled.
+* `magithub-request-data' is used instead of `url-request-data'."
+  (magithub-with-auth
+    (let (url-request-data (magithub-make-query-string magithub-request-data))
+      (url-retrieve (magit-request-url path) callback cbargs))))
+
 (defun magithub-retrieve-synchronously (path)
   "Retrieve GitHub API PATH synchronously.
 
@@ -47,15 +80,9 @@ Like `url-retrieve-synchronously', except for the following:
 * PATH is an API resource path, not a full URL.
 * GitHub authorization is automatically enabled.
 * `magithub-request-data' is used instead of `url-request-data'."
-  (let* ((auth (magithub-auth-info))
-         (magithub-request-data (append `(("login" . ,(car auth))
-                                          ("token" . ,(cdr auth)))
-                                        magithub-request-data))
-         (url-request-data (magithub-make-query-string magithub-request-data)))
-    (url-retrieve-synchronously (concat magithub-api-base path
-                                        (if (string= url-request-method "GET")
-                                            (concat "?" url-request-data)
-                                          "")))))
+  (magithub-with-auth
+    (let ((url-request-data (magithub-make-query-string magithub-request-data)))
+      (url-retrieve-synchronously (magit-request-url path)))))
 
 
 ;;; Configuration
