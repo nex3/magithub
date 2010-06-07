@@ -166,6 +166,47 @@ for the info then sets it to the git config."
     (cons user token)))
 
 
+;;; Creating Repos
+
+(defun magithub-create-from-local (name &optional description homepage private)
+  "Create a new GitHub repository for the current Git repository.
+NAME is the name of the GitHub repository, DESCRIPTION describes
+the repository, URL is the location of the homepage.  If PRIVATE
+is non-nil, a private repo is created.
+
+When called interactively, prompts for NAME, DESCRIPTION, and
+HOMEPAGE.  NAME defaults to the name of the current Git
+directory.  By default, creates a public repo; with a prefix arg,
+creates a private repo."
+  (interactive
+   (list (read-string "Repository name: "
+                      (file-name-nondirectory
+                       (directory-file-name
+                        (expand-file-name
+                         (magit-get-top-dir default-directory)))))
+         (read-string "Description: ")
+         (read-string "Homepage: ")
+         current-prefix-arg))
+
+  (let ((url-request-method "POST")
+        (magithub-request-data `(("name" . ,name)
+                                 ("description" . ,description)
+                                 ("homepage" . ,homepage)
+                                 ("private" . ,(if private "0" "1")))))
+    (magithub-retrieve "repos/create"
+                       (lambda (data name)
+                         (magit-git-string
+                          "remote" "add" "origin"
+                          (concat "git@github.com:" (magithub-config "user")
+                                  "/" name ".git"))
+                         (magit-set "origin" "branch" "master" "remote")
+                         (magit-set "refs/heads/master" "branch" "master" "merge")
+                         (magit-run-git-async "push" "-v" "origin" "master")
+                         (message "GitHub repository created: %s"
+                                  (plist-get (plist-get data :repository) :url)))
+                       (list name))))
+
+
 (provide 'magithub)
 
 ;;; magithub.el ends here
