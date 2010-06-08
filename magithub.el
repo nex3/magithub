@@ -237,6 +237,7 @@ and return (USERNAME . REPONAME)."
 (define-key magithub-map (kbd "c") 'magithub-clone)
 (define-key magithub-map (kbd "f") 'magithub-fork-current)
 (define-key magithub-map (kbd "p") 'magithub-pull-request)
+(define-key magithub-map (kbd "t") 'magithub-track)
 (define-key magit-mode-map (kbd "'") 'magithub-prefix)
 
 
@@ -514,6 +515,24 @@ Error out if this isn't a GitHub repo."
 
 Error out if this isn't a GitHub repo."
   (caddr (magithub-repo-info)))
+
+
+;;; Network
+
+(defun magithub-track (username &optional repo fetch)
+  "Track USERNAME/REPO as a remote.
+If FETCH is non-nil, fetch that remote.
+
+Interactively, prompts for the username and repo.  With a prefix
+arg, fetches the remote."
+  (interactive
+   (destructuring-bind (username . repo) (magithub-read-untracked-fork)
+     (list username repo current-prefix-arg)))
+  (magit-run-git "remote" "add" username
+                 (format "http://github.com/%s/%s.git" username repo))
+  (when fetch (magit-run-git-async "remote" "update" username))
+  (message "Tracking %s/%s%s" username repo
+           (if fetch ", fetching..." "")))
 
 
 ;;; Creating Repos
