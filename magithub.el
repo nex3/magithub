@@ -463,7 +463,7 @@ Once the repo is cloned, switch to a `magit-status' buffer for it.
 
 Interactively, prompts for the repo name and directory."
   (interactive
-   (destructuring-bind (username . repo) (magithub-read-repo)
+   (destructuring-bind (username . repo) (magithub-read-repo "Clone repo (user/repo): ")
      (list username repo (read-directory-name "Parent directory: "))))
   ;; The trailing slash is necessary for Magit to be able to figure out
   ;; that this is actually a directory, not a file
