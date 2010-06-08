@@ -319,8 +319,12 @@ rather than the JSON response object."
                           (search-forward "\n\n" nil t)) ; Move past headers
                         (magithub-handle-errors status)
                         (apply callback
-                               (when magithub-parse-response
-                                 (let ((json-object-type 'plist)) (json-read)))
+                               (if (not magithub-parse-response)
+                                   (current-buffer)
+                                 (let* ((json-object-type 'plist)
+                                        (obj (json-read)))
+                                   (kill-buffer)
+                                   obj))
                                cbargs))
                       cbargs)))))
 
@@ -660,7 +664,9 @@ RECIPIENTS should be a list of usernames."
         magithub-parse-response)
     (magithub-retrieve (list (magithub-repo-owner) (magithub-repo-name)
                              "pull_request" (magit-name-rev "HEAD"))
-                       (lambda (_) (message "Your pull request was sent.")))))
+                       (lambda (_)
+                         (kill-buffer)
+                         (message "Your pull request was sent.")))))
 
 (defun magithub-pull-request (recipients)
   "Compose a pull request and send it to RECIPIENTS.
