@@ -623,7 +623,7 @@ RECIPIENTS should be a list of usernames."
         (url-max-redirections 0) ;; GitHub will try to redirect, but we don't care
         magithub-parse-response)
     (magithub-retrieve (list (magithub-repo-owner) (magithub-repo-name)
-                             "pull_request" (magit-name-rev "HEAD^"))
+                             "pull_request" (magit-name-rev "HEAD"))
                        (lambda (_) (message "Your pull request was sent.")))))
 
 
