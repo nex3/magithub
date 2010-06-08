@@ -22,6 +22,11 @@
 (require 'url)
 (eval-when-compile (require 'cl))
 
+;;;###autoload
+(eval-after-load 'magit
+  (unless (featurep 'magithub)
+    (require 'magithub)))
+
 
 ;;; Variables
 
