@@ -22,11 +22,6 @@
 (require 'url)
 (eval-when-compile (require 'cl))
 
-;;;###autoload
-(eval-after-load 'magit
-  (unless (featurep 'magithub)
-    (require 'magithub)))
-
 
 ;;; Variables
 
@@ -723,3 +718,8 @@ printed as a message when the buffer is opened."
 (provide 'magithub)
 
 ;;; magithub.el ends here
+;;;###autoload
+(eval-after-load 'magit
+  (unless (featurep 'magithub)
+    (require 'magithub)))
+
