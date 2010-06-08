@@ -368,6 +368,45 @@ for the info then sets it to the git config."
     (cons user token)))
 
 
+;;; Repo Information
+
+(defun magithub-repo-info ()
+  "Return information about this GitHub repo.
+This is of the form (USERNAME REPONAME SSH).  USERNAME is the
+owner of the repo, REPONAME is the name of the repo, and SSH
+is non-nil if it's checked out via SSH.
+
+Error out if this isn't a GitHub repo."
+  (or
+   (block nil
+     (let ((url (magit-get "remote" "origin" "url")))
+       (unless url (return))
+       (when (string-match "\\(?:git\\|http\\)://github\\.com/\\(.*?\\)/\\(.*\\)\.git" url)
+         (return (list (match-string 1 url) (match-string 2 url) nil)))
+       (when (string-match "git@github\\.com:\\(.*?\\)/\\(.*\\)\\.git" url)
+         (return (list (match-string 1 url) (match-string 2 url) t)))
+       (return)))
+   (error "Not in a GitHub repo")))
+
+(defun magithub-repo-owner ()
+  "Return the name of the owner of this GitHub repo.
+
+Error out if this isn't a GitHub repo."
+  (car (magithub-repo-info)))
+
+(defun magithub-repo-name ()
+  "Return the name of this GitHub repo.
+
+Error out if this isn't a GitHub repo."
+  (cadr (magithub-repo-info)))
+
+(defun magithub-repo-ssh-p ()
+  "Return non-nil if this GitHub repo is checked out via SSH.
+
+Error out if this isn't a GitHub repo."
+  (caddr (magithub-repo-info)))
+
+
 ;;; Creating Repos
 
 (defun magithub-create-from-local (name &optional description homepage private)
