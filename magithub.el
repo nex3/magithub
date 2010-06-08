@@ -210,6 +210,25 @@ predicate that the string must satisfy."
       nil nil (concat (mapconcat 'identity collabs crm-separator)
                       (if (= (length collabs) (length network)) "" crm-separator))))))
 
+(defun magithub-read-untracked-fork ()
+  "Read the name of a fork of this repo that we aren't yet tracking.
+This will accept either a username or a username/repo pair,
+and return (USERNAME . REPONAME)."
+  (let ((fork
+         (completing-read
+          "Track fork (user or user/repo): "
+          (-magithub-lazy-completion-callback
+           (lambda ()
+             (mapcar (lambda (repo) (concat (plist-get repo :owner) "/"
+                                       (plist-get repo :name)))
+                     (magithub-untracked-forks)))
+           'noarg)
+          nil nil nil 'magithub-repos-history)))
+    (cond
+     ((string= fork "") (error "No fork given"))
+     ((string-match "/" fork) (magithub-parse-repo fork))
+     (t (cons fork (magithub-repo-name))))))
+
 
 ;;; Bindings
 
@@ -447,8 +466,16 @@ If this repo has no parents, return the collaborators for it instead."
     (if (not parent) (magithub-repo-collaborators username repo)
       (destructuring-bind (parent-owner . parent-repo) (magithub-parse-repo parent)
         (magithub-repo-collaborators parent-owner parent-repo)))))
-   
 
+(defun magithub-untracked-forks ()
+  "Return a list of forks of this repo that aren't being tracked as remotes.
+Returned repos are decoded JSON objects (plists)."
+  (lexical-let ((remotes (magit-git-lines "remote")))
+    (delq "origin" remotes)
+    (push (magithub-repo-owner) remotes)
+    (-magithub-remove-if
+     (lambda (repo) (member-ignore-case (plist-get repo :owner) remotes))
+     (magithub-repo-network))))
 
 ;;; Local Repo Information
 
