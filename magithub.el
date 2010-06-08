@@ -34,6 +34,12 @@
 
 This is used for some calls that aren't supported by the official API.")
 
+(defvar magithub-gist-url "http://gist.github.com/"
+  "The URL for the Gist site.")
+
+(defvar magithub-view-gist t
+  "Whether or not to open new Gists in the browser.")
+
 (defvar magithub-request-data nil
   "An assoc list of parameter names to values.
 
@@ -238,6 +244,7 @@ and return (USERNAME . REPONAME)."
 (define-key magithub-map (kbd "f") 'magithub-fork-current)
 (define-key magithub-map (kbd "p") 'magithub-pull-request)
 (define-key magithub-map (kbd "t") 'magithub-track)
+(define-key magithub-map (kbd "g") 'magithub-gist-repo)
 (define-key magit-mode-map (kbd "'") 'magithub-prefix)
 
 
@@ -333,7 +340,7 @@ Like `url-retrieve-synchronously', except for the following:
     (let ((url-request-data (magithub-make-query-string magithub-request-data)))
       (with-current-buffer (url-retrieve-synchronously (magit-request-url path))
         (goto-char (point-min))
-        (if (not magithub-parse-response) current-buffer
+        (if (not magithub-parse-response) (current-buffer)
           (search-forward "\n\n" nil t) ; Move past headers
           (let* ((data (let ((json-object-type 'plist)) (json-read)))
                  (err (plist-get data :error)))
@@ -536,6 +543,41 @@ arg, fetches the remote."
 
 
 ;;; Creating Repos
+
+(defun magithub-gist-repo (&optional private)
+  "Upload the current repo as a Gist.
+If PRIVATE is non-nil or with a prefix arg, the Gist is private.
+
+Copies the URL of the Gist into the kill ring.  If
+`magithub-view-gist' is non-nil (the default), opens the gist in
+the browser with `browse-url'."
+  (interactive "P")
+  (let ((url-max-redirections 0)
+        (url-request-method "POST")
+        (magithub-api-base magithub-gist-url)
+        (magithub-request-data
+         `(,@(if private '(("private" . "1")))
+           ("file_ext[gistfile1]" . ".dummy")
+           ("file_name[gistfile1]" . "dummy")
+           ("file_contents[gistfile1]" .
+            "Dummy Gist created by Magithub. To be replaced with a real repo.")))
+        magithub-parse-response)
+    (let (url)
+      (with-current-buffer (magithub-retrieve-synchronously "gists")
+        (goto-char (point-min))
+        (re-search-forward "^Location: \\(.*\\)$")
+        (setq url (match-string 1))
+        (kill-buffer))
+      (kill-new url)
+      (let ((ssh-url (replace-regexp-in-string
+                      "^http://gist\\.github\\.com/"
+                      "git@gist.github.com:" url)))
+        (magit-run-git "remote" "add" "origin" ssh-url)
+        (magit-set "origin" "branch" "master" "remote")
+        (magit-set "refs/heads/master" "branch" "master" "merge")
+        (magit-run-git-async "push" "-v" "-f" "origin" "master")
+        (when magithub-view-gist (browse-url url))
+        (message "Gist created: %s" url)))))
 
 (defun magithub-create-from-local (name &optional description homepage private)
   "Create a new GitHub repository for the current Git repository.
