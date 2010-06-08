@@ -51,6 +51,16 @@ This cache is only maintained within a single call to
 (defconst magithub-max-users-for-search 30
   "The maximum number of users GitHub will return for a user search.")
 
+(defvar -magithub-repos-cache nil
+  "An assoc list from usernames to repos owned by those users.
+
+Each entry is of the form (USERNAME . REPOS), where REPOS is an
+array containing decoded JSON responses from the GitHub
+API (plists).
+
+This cache is only maintained within a single call to
+`magithub-read-repo'.")
+
 
 ;;; Utilities
 
@@ -84,6 +94,9 @@ incorrect."
         (cons username repo))
     (wrong-number-of-arguments (error "Invalid GitHub repository %s" repo))))
 
+
+;;; Reading Input
+
 (defun magithub-read-user (&optional prompt)
   "Read a GitHub username from the minibuffer with completion.
 PROMPT is a string to prompt with, defaulting to \"GitHub user: \".
@@ -115,6 +128,8 @@ WARNING: This function currently doesn't work fully, since
 GitHub's user search API only returns 30 (apparently random)
 users, and also has no way to search for users whose names begin
 with certain characters."
+  ;; TODO: Make sure searching for "foo" then "fo" then "foo" doesn't
+  ;; do three API requests.
   (flet ((with-prefix (users pfx)
            (lexical-let ((pfx pfx))
              (-magithub-remove-if
@@ -144,6 +159,43 @@ with certain characters."
                 -magithub-users-cache)
           matching-users))))))
 
+(defun magithub-read-repo-for-user (user &optional prompt)
+  "Read a GitHub repository from the minibuffer with completion.
+USER is the owner of the repository.  PROMPT is a string to
+prompt with, defaulting to \"GitHub repo: <user>/\"."
+  (let ((-magithub-repos-cache nil))
+    (lexical-let ((user user))
+      (completing-read (or prompt (concat "GitHub repo: " user "/"))
+                       (lambda (&rest args)
+                         (apply '-magithub-complete-repo-for-user user args))))))
+
+(defun -magithub-complete-repo-for-user (user string predicate allp)
+  "Try completing the given GitHub repository.
+USER is the owner of the repository
+STRING is the text already in the minibuffer, PREDICATE is a
+predicate that the string must satisfy."
+  (let ((repos (mapcar (lambda (repo) (plist-get repo :name))
+                       (-magithub-repos-for-user user))))
+    (if allp (all-completions string repos predicate)
+      (try-completion string repos predicate))))
+
+(defun -magithub-repos-for-user (user)
+  "Returns a list of all repos owned by USER.
+
+The repos are lists of decoded JSON objects (plists)."
+  (let ((repos (cdr (assoc user -magithub-repos-cache))))
+    (unless repos
+      (let* ((url-request-method "GET"))
+        (setq repos
+              (append ;; Convert to list
+               (plist-get
+                (magithub-retrieve-synchronously
+                 (concat "repos/show/" (url-hexify-string user)))
+                :repositories)
+               nil))
+        (push (cons user repos) -magithub-repos-cache)))
+    repos))
+    
 
 ;;; Bindings
 
