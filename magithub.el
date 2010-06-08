@@ -20,6 +20,7 @@
 
 (require 'magit)
 (require 'url)
+(require 'json)
 (eval-when-compile (require 'cl))
 
 
