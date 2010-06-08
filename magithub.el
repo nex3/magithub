@@ -37,19 +37,12 @@ and `magithub-retrieve-synchronously'.")
 (defvar -magithub-users-cache nil
   "An assoc list of username prefixes to users matching those prefixes.
 
-Each entry is of the form (PREFIX COMPLETE . USERS).  PREFIX is
-the string prefix of all users; COMPLETE is whether or not all
-users with that prefix are in USERS (since GitHub doesn't always
-return all users); and USERS is an array of decoded JSON
+Each entry is of the form (PREFIX . USERS).  PREFIX is the string
+prefix of all users, and USERS is an array of decoded JSON
 responses from the GitHub API (plists).
-
-Longer prefixes should appear earlier in the list.
 
 This cache is only maintained within a single call to
 `magithub-read-user'.")
-
-(defconst magithub-max-users-for-search 30
-  "The maximum number of users GitHub will return for a user search.")
 
 (defvar -magithub-repos-cache nil
   "An assoc list from usernames to repos owned by those users.
@@ -102,9 +95,9 @@ incorrect."
 PROMPT is a string to prompt with, defaulting to \"GitHub user: \".
 
 WARNING: This function currently doesn't work fully, since
-GitHub's user search API only returns 30 (apparently random)
-users, and also has no way to search for users whose names begin
-with certain characters."
+GitHub's user search API only returns an apparently random subset
+of users, and also has no way to search for users whose names
+begin with certain characters."
   (let ((-magithub-users-cache nil))
     (completing-read (or prompt "GitHub user: ") '-magithub-complete-user)))
 
@@ -125,26 +118,17 @@ Caches the results in `-magithub-users-cache', which should be
 let-bound around a call to this function.
 
 WARNING: This function currently doesn't work fully, since
-GitHub's user search API only returns 30 (apparently random)
-users, and also has no way to search for users whose names begin
-with certain characters."
-  ;; TODO: Make sure searching for "foo" then "fo" then "foo" doesn't
-  ;; do three API requests.
+GitHub's user search API only returns an apparently random subset
+of users, and also has no way to search for users whose names
+begin with certain characters."
   (flet ((with-prefix (users pfx)
            (lexical-let ((pfx pfx))
              (-magithub-remove-if
               (lambda (user) (not (string-prefix-p pfx (plist-get user :name) 'ignore-case)))
               users))))
-    (let ((users (assoc* prefix -magithub-users-cache
-                         :test (lambda (s1 s2) (string-prefix-p s2 s1 'ignore-case)))))
-      (cond
-       ;; We've cached the users for this prefix (or a prefix of it)
-       ((and users (string= (car users) prefix)) (cddr users))
-       ;; We've cached the users for a prefix of this prefix,
-       ;; and we won't get more users from another GitHub call
-       ((and users (cadr users)) (with-prefix (cddr users) prefix))
+    (let ((users (assoc prefix -magithub-users-cache)))
+      (if users (cddr users) ;; We've cached the users for this prefix
        ;; We need to run a GitHub call to get more users
-       (t
         (let* ((url-request-method "GET")
                (users (plist-get
                        (magithub-retrieve-synchronously
@@ -154,10 +138,8 @@ with certain characters."
           ;; If the length is less than the max, then this is all users
           ;; with this substring in their usernames,
           ;; so we don't need to do more GitHub searches
-          (push (list* prefix (< (length users) magithub-max-users-for-search)
-                       matching-users)
-                -magithub-users-cache)
-          matching-users))))))
+          (push (cons prefix matching-users) -magithub-users-cache)
+          matching-users)))))
 
 (defun magithub-read-repo-for-user (user &optional prompt)
   "Read a GitHub repository from the minibuffer with completion.
@@ -203,9 +185,9 @@ PROMPT is a string to prompt with, defaulting to
 \"GitHub repo (user/repo): \".
 
 WARNING: This function currently doesn't work fully, since
-GitHub's user search API only returns 30 (apparently random)
-users, and also has no way to search for users whose names begin
-with certain characters."
+GitHub's user search API only returns an apparently random subset
+of users, and also has no way to search for users whose names
+begin with certain characters."
   (let ((-magithub-users-cache nil)
         (-magithub-repos-cache nil))
     (completing-read (or prompt "GitHub repo: ") '-magithub-complete-repo)))
