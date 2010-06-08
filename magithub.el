@@ -425,7 +425,7 @@ subset of users."
   "Return an object representing the repo USERNAME/REPO.
 Defaults to the current repo.
 
-The returned object is a deccoded JSON object (plist)."
+The returned object is a decoded JSON object (plist)."
   (setq username (or username (magithub-repo-owner)))
   (setq repo (or repo (magithub-repo-name)))
   (remhash (cons username repo) -magithub-repo-obj-cache)
@@ -435,7 +435,7 @@ The returned object is a deccoded JSON object (plist)."
   "Return a (possibly cached) object representing the repo USERNAME/REPO.
 Defaults to the current repo.
 
-The returned object is a deccoded JSON object (plist).
+The returned object is a decoded JSON object (plist).
 
 This differs from `magithub-repo-obj' in that it returns a cached
 copy of the repo object if one exists.  This is useful for
@@ -452,6 +452,17 @@ change."
                      :repository)))
           (puthash (cons username repo) obj -magithub-repo-obj-cache)
           obj))))
+
+(defun magithub-repo-collaborators (&optional username repo)
+  "Return an array of names of collaborators on USERNAME/REPO.
+Defaults to the current repo."
+  (setq username (or username (magithub-repo-owner)))
+  (setq repo (or repo (magithub-repo-name)))
+  (let ((url-request-method "GET"))
+    (plist-get
+     (magithub-retrieve-synchronously
+      (list "repos" "show" username repo "collaborators"))
+     :collaborators)))
 
 
 ;;; Local Repo Information
