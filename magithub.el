@@ -34,6 +34,12 @@
 This is meant to be dynamically bound around `magithub-retrieve'
 and `magithub-retrieve-synchronously'.")
 
+(defvar magithub-users-history nil
+  "A list of users selected via `magithub-read-user'.")
+
+(defvar magithub-repos-history nil
+  "A list of repos selected via `magithub-read-repo'.")
+
 (defvar -magithub-users-cache nil
   "An assoc list of username prefixes to users matching those prefixes.
 
@@ -96,12 +102,14 @@ incorrect."
 
 PROMPT, PREDICATE, REQUIRE-MATCH, INITIAL-INPUT, HIST, DEF, and
 INHERIT-INPUT-METHOD work as in `completing-read'.  PROMPT
-defaults to \"GitHub user: \".
+defaults to \"GitHub user: \".  HIST defaults to
+'magithub-users-history.
 
 WARNING: This function currently doesn't work fully, since
 GitHub's user search API only returns an apparently random subset
 of users, and also has no way to search for users whose names
 begin with certain characters."
+  (setq hist (or hist 'magithub-users-history))
   (let ((-magithub-users-cache nil))
     (completing-read (or prompt "GitHub user: ") '-magithub-complete-user predicate
                      require-match initial-input hist def inherit-input-method)))
@@ -196,13 +204,15 @@ Return (USERNAME . REPO), or nil if the user enters no input.
 
 PROMPT, PREDICATE, REQUIRE-MATCH, INITIAL-INPUT, HIST, DEF, and
 INHERIT-INPUT-METHOD work as in `completing-read'.  PROMPT
-defaults to \"GitHub repo (user/repo): \".  If REQUIRE-MATCH is
-non-nil and the user enters no input, raises an error.
+defaults to \"GitHub repo (user/repo): \".  HIST defaults to
+'magithub-repos-history.  If REQUIRE-MATCH is non-nil and the
+user enters no input, raises an error.
 
 WARNING: This function currently doesn't work fully, since
 GitHub's user search API only returns an apparently random subset
 of users, and also has no way to search for users whose names
 begin with certain characters."
+  (setq hist (or hist 'magithub-repos-history))
   (let ((-magithub-users-cache nil)
         (-magithub-repos-cache nil))
     (let ((result (completing-read (or prompt "GitHub repo (user/repo): ")
