@@ -271,6 +271,7 @@ predicate that the string must satisfy."
 (define-key magithub-map (kbd "C") 'magithub-create-from-local)
 (define-key magithub-map (kbd "c") 'magithub-clone)
 (define-key magithub-map (kbd "f") 'magithub-fork-current)
+(define-key magithub-map (kbd "p") 'magithub-pull-request)
 (define-key magit-mode-map (kbd "'") 'magithub-prefix)
 
 
@@ -625,6 +626,91 @@ RECIPIENTS should be a list of usernames."
     (magithub-retrieve (list (magithub-repo-owner) (magithub-repo-name)
                              "pull_request" (magit-name-rev "HEAD"))
                        (lambda (_) (message "Your pull request was sent.")))))
+
+(defun magithub-pull-request (recipients)
+  "Compose a pull request and send it to RECIPIENTS.
+RECIPIENTS should be a list of usernames.
+
+Interactively, reads RECIPIENTS via `magithub-read-pull-request-recipients'.
+For non-interactive pull requests, see `magithub-send-pull-request'."
+  (interactive (list (magithub-read-pull-request-recipients)))
+  (with-magithub-message-mode
+    (magit-log-edit-set-field
+     'recipients (mapconcat 'identity recipients crm-separator)))
+  (magithub-pop-to-message "send pull request"))
+
+
+;;; Message Mode
+
+(defvar magithub-message-mode-hook nil "Hook run by `magithub-message-mode'.")
+
+(defvar magithub-message-confirm-cancellation magit-log-edit-confirm-cancellation
+  "If non-nil, confirm when cancelling the editing of a `magithub-message-mode' buffer.")
+
+(defconst magithub-message-buffer-name "*magithub-edit-message*"
+  "Buffer name for composing messages.")
+
+(defconst magithub-message-header-end "-- End of Magithub header --\n")
+
+(defvar magithub-message-mode-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map (kbd "C-c C-c") 'magithub-message-send)
+    (define-key map (kbd "C-c C-k") 'magithub-message-cancel)
+    (define-key map (kbd "C-c C-]") 'magithub-message-cancel)
+    map)
+  "The keymap for `magithub-message-mode'.")
+
+(defvar magithub-pre-message-window-configuration nil)
+
+(macrolet
+    ((define-it (parent-mode)
+       `(define-derived-mode magithub-message-mode ,parent-mode "Magithub Message Edit"
+          "A mode for editing pull requests and other GitHub messages."
+          (run-mode-hooks 'magithub-message-mode-hook))))
+  (if (featurep 'markdown-mode) (define-it markdown-mode)
+    (define-it text-mode)))
+
+(defmacro with-magithub-message-mode (&rest body)
+  "Runs BODY with Magit's log-edit functions usable with Magithub's message mode."
+  (declare (indent 0))
+  `(let ((magit-log-edit-buffer-name magithub-message-buffer-name)
+         (magit-log-header-end magithub-message-header-end)
+         (magit-log-edit-confirm-cancellation
+          magithub-message-confirm-cancellation)
+         (magit-pre-log-edit-window-configuration
+          magithub-pre-message-window-configuration))
+     (unwind-protect (progn ,@body)
+       (setq magithub-pre-message-window-configuration
+             magit-pre-log-edit-window-configuration))))
+
+(defun magithub-pop-to-message (operation)
+  "Open up a `magithub-message-mode' buffer and switch to it.
+OPERATION is the name of what will happen when C-c C-c is used,
+printed as a message when the buffer is opened."
+  (let ((dir default-directory)
+	(buf (get-buffer-create magithub-message-buffer-name)))
+    (setq magithub-pre-message-window-configuration
+	  (current-window-configuration))
+    (pop-to-buffer buf)
+    (setq default-directory dir)
+    (magithub-message-mode)
+    (message "Type C-c C-c to %s (C-c C-k to cancel)." operation)))
+
+(defun magithub-message-send ()
+  "Finish writing the message and send it."
+  (interactive)
+  (let ((recipients (with-magithub-message-mode
+                      (magit-log-edit-get-field 'recipients))))
+    (with-magithub-message-mode (magit-log-edit-set-fields nil))
+    (magithub-send-pull-request
+     (buffer-string) (split-string recipients crm-separator))
+    (let (magithub-message-confirm-cancellation)
+      (magithub-message-cancel))))
+
+(defun magithub-message-cancel ()
+  "Abort and erase message being composed."
+  (interactive)
+  (with-magithub-message-mode (magit-log-edit-cancel-log-message)))
 
 
 (provide 'magithub)
