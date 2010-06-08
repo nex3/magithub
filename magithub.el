@@ -603,7 +603,7 @@ Interactively, prompts for the repo name and directory."
   "Fork the current repository in place."
   (interactive)
   (destructuring-bind (owner repo _) (magithub-repo-info)
-    (let ((url-request-method "GET"))
+    (let ((url-request-method "POST"))
       (magithub-retrieve (list "repos" "fork" owner repo)
                          (lambda (obj owner repo)
                            (magit-with-refresh
