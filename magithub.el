@@ -33,6 +33,11 @@
 (defvar magithub-api-base "https://github.com/api/v2/json/"
   "The base URL for accessing the GitHub API.")
 
+(defvar magithub-github-url "https://github.com/"
+  "The URL for the main GitHub site.
+
+This is used for some calls that aren't supported by the official API.")
+
 (defvar magithub-request-data nil
   "An assoc list of parameter names to values.
 
@@ -324,16 +329,17 @@ If `magithub-parse-response' is nil, CALLBACK is just passed nil
 rather than the JSON response object."
   (magithub-with-auth
     (let ((url-request-data (magithub-make-query-string magithub-request-data)))
-      (url-retrieve (magit-request-url path)
-                    (lambda (status callback &rest cbargs)
-                      (when magithub-parse-response
-                        (search-forward "\n\n" nil t)) ; Move past headers
-                      (magithub-handle-errors status)
-                      (apply callback
-                             (when magithub-parse-response
-                               (let ((json-object-type 'plist)) (json-read)))
-                             cbargs))
-                    (cons callback cbargs)))))
+      (lexical-let ((callback callback) (magithub-parse-response magithub-parse-response))
+        (url-retrieve (magit-request-url path)
+                      (lambda (status &rest cbargs)
+                        (when magithub-parse-response
+                          (search-forward "\n\n" nil t)) ; Move past headers
+                        (magithub-handle-errors status)
+                        (apply callback
+                               (when magithub-parse-response
+                                 (let ((json-object-type 'plist)) (json-read)))
+                               cbargs))
+                      cbargs)))))
 
 (defun magithub-retrieve-synchronously (path)
   "Retrieve GitHub API PATH synchronously.
@@ -502,6 +508,21 @@ Interactively, prompts for the repo name and directory."
                                         "remote" "origin" "url"))
                            (message "Forked %s/%s" owner repo))
                          (list owner repo)))))
+
+(defun magithub-send-pull-request (text recipients)
+  "Send a pull request with text TEXT to RECIPIENTS.
+RECIPIENTS should be a list of usernames."
+  (let ((url-request-method "POST")
+        (magithub-request-data (cons (cons "message[body]" text)
+                                     (mapcar (lambda (recipient)
+                                               (cons "message[to][]" recipient))
+                                             recipients)))
+        (magithub-api-base magithub-github-url)
+        (url-max-redirections 0) ;; GitHub will try to redirect, but we don't care
+        magithub-parse-response)
+    (magithub-retrieve (list (magithub-repo-owner) (magithub-repo-name)
+                             "pull_request" (magit-name-rev "HEAD^"))
+                       (lambda (_) (message "Your pull request was sent.")))))
 
 
 (provide 'magithub)
