@@ -196,7 +196,8 @@ Return (USERNAME . REPO), or nil if the user enters no input.
 
 PROMPT, PREDICATE, REQUIRE-MATCH, INITIAL-INPUT, HIST, DEF, and
 INHERIT-INPUT-METHOD work as in `completing-read'.  PROMPT
-defaults to \"GitHub repo (user/repo): \".
+defaults to \"GitHub repo (user/repo): \".  If REQUIRE-MATCH is
+non-nil and the user enters no input, raises an error.
 
 WARNING: This function currently doesn't work fully, since
 GitHub's user search API only returns an apparently random subset
@@ -204,9 +205,12 @@ of users, and also has no way to search for users whose names
 begin with certain characters."
   (let ((-magithub-users-cache nil)
         (-magithub-repos-cache nil))
-    (completing-read (or prompt "GitHub repo (user/repo): ") '-magithub-complete-repo
-                     predicate require-match initial-input hist def
-                     inherit-input-method)))
+    (let ((result (completing-read (or prompt "GitHub repo (user/repo): ")
+                                   '-magithub-complete-repo predicate require-match
+                                   initial-input hist def inherit-input-method)))
+      (if (string= result "")
+          (when require-match (error "No repository given"))
+        result))))
 
 (defun -magithub-complete-repo (string predicate allp)
   "Try completing the given GitHub user/repository pair.
