@@ -90,16 +90,21 @@ incorrect."
 
 ;;; Reading Input
 
-(defun magithub-read-user (&optional prompt)
+(defun magithub-read-user (&optional prompt predicate require-match initial-input
+                                     hist def inherit-input-method)
   "Read a GitHub username from the minibuffer with completion.
-PROMPT is a string to prompt with, defaulting to \"GitHub user: \".
+
+PROMPT, PREDICATE, REQUIRE-MATCH, INITIAL-INPUT, HIST, DEF, and
+INHERIT-INPUT-METHOD work as in `completing-read'.  PROMPT
+defaults to \"GitHub user: \".
 
 WARNING: This function currently doesn't work fully, since
 GitHub's user search API only returns an apparently random subset
 of users, and also has no way to search for users whose names
 begin with certain characters."
   (let ((-magithub-users-cache nil))
-    (completing-read (or prompt "GitHub user: ") '-magithub-complete-user)))
+    (completing-read (or prompt "GitHub user: ") '-magithub-complete-user predicate
+                     require-match initial-input hist def inherit-input-method)))
 
 (defun -magithub-complete-user (string predicate allp)
   "Try completing the given GitHub username.
@@ -141,15 +146,21 @@ begin with certain characters."
           (push (cons prefix matching-users) -magithub-users-cache)
           matching-users)))))
 
-(defun magithub-read-repo-for-user (user &optional prompt)
+(defun magithub-read-repo-for-user (user &optional prompt predicate require-match
+                                         initial-input hist def inherit-input-method)
   "Read a GitHub repository from the minibuffer with completion.
-USER is the owner of the repository.  PROMPT is a string to
-prompt with, defaulting to \"GitHub repo: <user>/\"."
+USER is the owner of the repository.
+
+PROMPT, PREDICATE, REQUIRE-MATCH, INITIAL-INPUT, HIST, DEF, and
+INHERIT-INPUT-METHOD work as in `completing-read'.  PROMPT
+defaults to \"GitHub repo: <user>/\"."
   (let ((-magithub-repos-cache nil))
     (lexical-let ((user user))
       (completing-read (or prompt (concat "GitHub repo: " user "/"))
                        (lambda (&rest args)
-                         (apply '-magithub-complete-repo-for-user user args))))))
+                         (apply '-magithub-complete-repo-for-user user args))
+                       predicate require-match initial-input hist def
+                       inherit-input-method))))
 
 (defun -magithub-complete-repo-for-user (user string predicate allp)
   "Try completing the given GitHub repository.
@@ -178,11 +189,14 @@ The repos are lists of decoded JSON objects (plists)."
         (push (cons user repos) -magithub-repos-cache)))
     repos))
 
-(defun magithub-read-repo (&optional prompt)
+(defun magithub-read-repo (&optional prompt predicate require-match initial-input
+                                     hist def inherit-input-method)
   "Read a GitHub user-repository pair with completion.
 Return (USERNAME . REPO), or nil if the user enters no input.
-PROMPT is a string to prompt with, defaulting to
-\"GitHub repo (user/repo): \".
+
+PROMPT, PREDICATE, REQUIRE-MATCH, INITIAL-INPUT, HIST, DEF, and
+INHERIT-INPUT-METHOD work as in `completing-read'.  PROMPT
+defaults to \"GitHub repo (user/repo): \".
 
 WARNING: This function currently doesn't work fully, since
 GitHub's user search API only returns an apparently random subset
@@ -190,7 +204,9 @@ of users, and also has no way to search for users whose names
 begin with certain characters."
   (let ((-magithub-users-cache nil)
         (-magithub-repos-cache nil))
-    (completing-read (or prompt "GitHub repo: ") '-magithub-complete-repo)))
+    (completing-read (or prompt "GitHub repo (user/repo): ") '-magithub-complete-repo
+                     predicate require-match initial-input hist def
+                     inherit-input-method)))
 
 (defun -magithub-complete-repo (string predicate allp)
   "Try completing the given GitHub user/repository pair.
