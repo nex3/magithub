@@ -251,6 +251,7 @@ predicate that the string must satisfy."
 (define-prefix-command 'magithub-prefix 'magithub-map)
 (define-key magithub-map (kbd "C") 'magithub-create-from-local)
 (define-key magithub-map (kbd "c") 'magithub-clone)
+(define-key magithub-map (kbd "f") 'magithub-fork-current)
 (define-key magit-mode-map (kbd "'") 'magithub-prefix)
 
 
@@ -470,6 +471,22 @@ Interactively, prompts for the repo name and directory."
   (let ((dir (concat (directory-file-name (expand-file-name dir)) "/" repo "/")))
     (magit-run-git "clone" (concat "http://github.com/" username "/" repo ".git") dir)
     (magit-status dir)))
+
+
+;;; Forking Repos
+
+(defun magithub-fork-current ()
+  "Fork the current repository in place."
+  (interactive)
+  (destructuring-bind (owner repo _) (magithub-repo-info)
+    (let ((url-request-method "GET"))
+      (magithub-retrieve (list "repos" "fork" owner repo)
+                         (lambda (obj owner repo)
+                           (magit-with-refresh
+                             (magit-set (concat "git@github.com:" owner "/" repo ".git")
+                                        "remote" "origin" "url"))
+                           (message "Forked %s/%s" owner repo))
+                         (list owner repo)))))
 
 
 (provide 'magithub)
