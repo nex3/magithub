@@ -55,6 +55,19 @@ This should only ever be `let'-bound, not set outright.")
 (defvar magithub-repos-history nil
   "A list of repos selected via `magithub-read-repo'.")
 
+(defvar magithub-request-cache-size 20
+  "The number of requests that Magithub will cache.
+
+These are used along with the ETag header to avoid making
+needless large requests.")
+
+(defvar -magithub-request-cache (make-ring magithub-request-cache-size)
+  "A cache of GET requests made by Magithub.
+
+Actually a ring of (URL ETAG OBJ) pairs. URL is the URL of the
+resource accessed; ETAG is the ETag header sent by the server;
+and OBJ is the decoded JSON object (plist) returned by the server.")
+
 (defvar -magithub-users-cache nil
   "An assoc list of username prefixes to users matching those prefixes.
 
@@ -89,6 +102,20 @@ Like `remove-if', but without the cl runtime dependency."
   (loop for el being the elements of seq
         if (not (funcall predicate el)) collect el into els
         finally return els))
+
+(defun -magithub-ring-assoc (ring key)
+  "Return the first element of RING whose car is KEY.
+This element is also moved to the front of the ring.
+If no such element is found, return nil.
+
+Unlike `assoc', returns only the `cdr' of the value."
+  (catch 'found
+    (dotimes (i (ring-length ring))
+      (when (equal key (car (ring-ref ring i)))
+        (let ((val (ring-ref ring i)))
+          (ring-remove ring i)
+          (ring-insert ring val)
+          (throw 'found val))))))
 
 (defun magithub-make-query-string (params)
   "Return a query string constructed from PARAMS.
@@ -321,6 +348,34 @@ signaled."
                      (error "GitHub error: %s" err))
                  (json-readtable-error (signal (car val) (cdr val))))))))
 
+(defun -magithub-eat-headers ()
+  "Move the point past any headers and return the value of the ETag.
+If there is no ETag, return nil."
+  (goto-char (point-min))
+  (search-forward "\n\n" nil t) ;; Past headers
+  (when (search-backward-regexp "^ETag: \"\\(.*\\)\"" nil t)
+    (let ((etag (match-string 1)))
+      (search-forward "\n\n" nil t) ;; Past headers again
+      etag)))
+  
+
+(defun -magithub-cache-get (url)
+  "Check the cache for URL and return (ETAG CACHED) if it's cached.
+Otherwise, return nil.
+
+The cache is kept in `-magithub-request-cache'."
+  (block nil
+    (unless (string= url-request-method "GET") (return))
+    (let ((cached (-magithub-ring-assoc -magithub-request-cache url)))
+      (unless cached (return))
+      (return (cdr cached)))))
+
+(defun -magithub-cache-set (url etag cached)
+  "Set the cache for URL to (ETAG CACHED).
+The cache is kept in `-magithub-request-cache'."
+  (when (and etag cached)
+    (ring-insert -magithub-request-cache (list url etag cached))))
+
 (defun magithub-retrieve (path callback &optional cbargs)
   "Retrieve GitHub API PATH asynchronously.
 Call CALLBACK with CBARGS when finished.
@@ -338,18 +393,30 @@ Like `url-retrieve', except for the following:
 If `magithub-parse-response' is nil, CALLBACK is just passed nil
 rather than the JSON response object."
   (magithub-with-auth
-    (let ((url-request-data (magithub-make-query-string magithub-request-data)))
-      (lexical-let ((callback callback) (magithub-parse-response magithub-parse-response))
-        (url-retrieve (magit-request-url path)
-                      (lambda (status &rest cbargs)
-                        (when magithub-parse-response
-                          (search-forward "\n\n" nil t)) ; Move past headers
-                        (magithub-handle-errors status)
-                        (apply callback
-                               (when magithub-parse-response
-                                 (let ((json-object-type 'plist)) (json-read)))
-                               cbargs))
-                      cbargs)))))
+    (let* ((url-request-data (magithub-make-query-string magithub-request-data))
+           (url (magit-request-url path))
+           (cached (-magithub-cache-get url))
+           (url-request-extra-headers
+            (cons
+             (when cached `("If-None-Match" . ,(car cached)))
+             url-request-extra-headers)))
+      (lexical-let ((url url) (callback callback) (cached cached)
+                    (magithub-parse-response magithub-parse-response))
+        (url-retrieve
+         url
+         (lambda (status &rest cbargs)
+           (if (and magithub-parse-response cached
+                    (eq url-http-response-status 304)) ;; Not Modified
+               (apply callback (cadr cached) cbargs)
+             (let (etag obj)
+               (magithub-handle-errors status)
+               (when magithub-parse-response
+                 (setq etag (-magithub-eat-headers))
+                 (let ((json-object-type 'plist)) (setq obj (json-read)))
+                 (when (and etag obj)
+                   (-magithub-cache-set url (list etag obj))))
+               (apply callback obj cbargs))))
+         cbargs)))))
 
 (defun magithub-retrieve-synchronously (path)
   "Retrieve GitHub API PATH synchronously.
@@ -364,16 +431,26 @@ Like `url-retrieve-synchronously', except for the following:
 * Return a decoded JSON object (as a plist) rather than a buffer
   containing the response unless `magithub-parse-response' is nil."
   (magithub-with-auth
-    (let ((url-request-data (magithub-make-query-string magithub-request-data)))
-      (with-current-buffer (url-retrieve-synchronously (magit-request-url path))
-        (goto-char (point-min))
-        (if (not magithub-parse-response) current-buffer
-          (search-forward "\n\n" nil t) ; Move past headers
-          (let* ((data (let ((json-object-type 'plist)) (json-read)))
-                 (err (plist-get data :error)))
-            (when err (error "GitHub error: %s" err))
-            (kill-buffer)
-            data))))))
+    (let* ((url-request-data (magithub-make-query-string magithub-request-data))
+           (url (magit-request-url path))
+           (cached (-magithub-cache-get url))
+           (url-request-extra-headers
+            (cons
+             (when cached `("If-None-Match" . ,(car cached)))
+             url-request-extra-headers)))
+      (with-current-buffer (url-retrieve-synchronously url)
+        (cond
+         ((not magithub-parse-response) current-buffer)
+         ((and cached (eq url-http-response-status 304)) (cadr cached)) ;; Not Modified
+         (t
+          (let (etag obj)
+            (setq etag (-magithub-eat-headers))
+            (let ((json-object-type 'plist)) (setq obj (json-read)))
+            (let ((err (plist-get obj :error)))
+              (when err (error "GitHub error: %s" err)))
+            (-magithub-cache-set url etag obj)
+            (pop-to-buffer (current-buffer))
+            obj)))))))
 
 
 ;;; Configuration
