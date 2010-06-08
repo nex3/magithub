@@ -153,7 +153,7 @@ begin with certain characters."
           (let* ((url-request-method "GET")
                  (users (plist-get
                          (magithub-retrieve-synchronously
-                          (concat "user/search/" (url-hexify-string string)))
+                          (list "user" "search" string))
                          :users))
                  (matching-users (with-prefix users prefix)))
             ;; If the length is less than the max, then this is all users
@@ -199,7 +199,7 @@ The repos are lists of decoded JSON objects (plists)."
               (append ;; Convert to list
                (plist-get
                 (magithub-retrieve-synchronously
-                 (concat "repos/show/" (url-hexify-string user)))
+                 (list "repos" "show" user))
                 :repositories)
                nil))
         (push (cons user repos) -magithub-repos-cache)))
@@ -259,9 +259,13 @@ predicate that the string must satisfy."
 (defun magit-request-url (path)
   "Return the full GitHub URL for the resource PATH.
 
+PATH can either be a string or a list of strings.
+In the latter case, they're URL-escaped and joined with \"/\".
+
 If `url-request-method' is GET, the returned URL will include
 `url-request-data' as the query string."
-  (concat magithub-api-base path
+  (concat magithub-api-base
+          (if (stringp path) path (mapconcat 'url-hexify-string path "/"))
           (if (string= url-request-method "GET")
               (concat "?" url-request-data)
             "")))
@@ -298,6 +302,9 @@ signaled."
   "Retrieve GitHub API PATH asynchronously.
 Call CALLBACK with CBARGS when finished.
 
+PATH can either be a string or a list of strings.
+In the latter case, they're URL-escaped and joined with \"/\".
+
 Like `url-retrieve', except for the following:
 * PATH is an API resource path, not a full URL.
 * GitHub authorization is automatically enabled.
@@ -315,6 +322,9 @@ Like `url-retrieve', except for the following:
 
 (defun magithub-retrieve-synchronously (path)
   "Retrieve GitHub API PATH synchronously.
+
+PATH can either be a string or a list of strings.
+In the latter case, they're URL-escaped and joined with \"/\".
 
 Like `url-retrieve-synchronously', except for the following:
 * PATH is an API resource path, not a full URL.
