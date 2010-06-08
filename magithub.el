@@ -75,6 +75,11 @@ API (plists).
 This cache is only maintained within a single call to
 `magithub-read-repo'.")
 
+(defvar -magithub-repo-obj-cache (make-hash-table :test 'equal)
+  "A hash from (USERNAME . REPONAME) to decoded JSON repo objects (plists).
+This caches the result of `magithub-repo-obj' and
+`magithub-cached-repo-obj'.")
+
 
 ;;; Utilities
 
@@ -415,6 +420,38 @@ subset of users."
      (magithub-retrieve-synchronously
       (list "user" "search" string))
      :users)))
+
+(defun magithub-repo-obj (&optional username repo)
+  "Return an object representing the repo USERNAME/REPO.
+Defaults to the current repo.
+
+The returned object is a deccoded JSON object (plist)."
+  (setq username (or username (magithub-repo-owner)))
+  (setq repo (or repo (magithub-repo-name)))
+  (remhash (cons username repo) -magithub-repo-obj-cache)
+  (magithub-cached-repo-obj username repo))
+
+(defun magithub-cached-repo-obj (&optional username repo)
+  "Return a (possibly cached) object representing the repo USERNAME/REPO.
+Defaults to the current repo.
+
+The returned object is a deccoded JSON object (plist).
+
+This differs from `magithub-repo-obj' in that it returns a cached
+copy of the repo object if one exists.  This is useful for
+properties such as :parent and :fork that are highly unlikely to
+change."
+  (setq username (or username (magithub-repo-owner)))
+  (setq repo (or repo (magithub-repo-name)))
+  (let ((cached (gethash (cons username repo) -magithub-repo-obj-cache)))
+    (or cached
+        (let* ((url-request-method "GET")
+               (obj (plist-get
+                     (magithub-retrieve-synchronously
+                      (list "repos" "show" username repo))
+                     :repository)))
+          (puthash (cons username repo) obj -magithub-repo-obj-cache)
+          obj))))
 
 
 ;;; Local Repo Information
