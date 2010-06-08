@@ -75,6 +75,15 @@ Any parameters with a nil values are ignored."
                 (url-hexify-string (cdr param)))))
     params "&")))
 
+(defun magithub-parse-repo (repo)
+  "Parse a REPO string of the form \"username/repo\".
+Return (USERNAME . REPO), or raise an error if the format is
+incorrect."
+  (condition-case err
+      (destructuring-bind (username repo) (split-string repo "/")
+        (cons username repo))
+    (wrong-number-of-arguments (error "Invalid GitHub repository %s" repo))))
+
 (defun magithub-read-user (&optional prompt)
   "Read a GitHub username from the minibuffer with completion.
 PROMPT is a string to prompt with, defaulting to \"GitHub user: \".
