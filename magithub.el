@@ -713,6 +713,13 @@ printed as a message when the buffer is opened."
   (with-magithub-message-mode (magit-log-edit-cancel-log-message)))
 
 
+;;; Hooks into Magit
+
+(defadvice magit-init (after magithub-init-too (dir) activate)
+  (when (y-or-n-p "Create GitHub repo? ")
+    (let ((default-directory dir))
+      (call-interactively 'magithub-create-from-local))))
+
 (provide 'magithub)
 
 ;;; magithub.el ends here
