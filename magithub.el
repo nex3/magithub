@@ -34,6 +34,10 @@
 
 This is used for some calls that aren't supported by the official API.")
 
+(defvar magithub-use-ssl nil
+  "If non-nil, access GitHub via HTTPS.
+This is more secure, but slower.")
+
 (defvar magithub-gist-url "http://gist.github.com/"
   "The URL for the Gist site.")
 
@@ -258,11 +262,14 @@ In the latter case, they're URL-escaped and joined with \"/\".
 
 If `url-request-method' is GET, the returned URL will include
 `url-request-data' as the query string."
-  (concat magithub-api-base
-          (if (stringp path) path (mapconcat 'url-hexify-string path "/"))
-          (if (string= url-request-method "GET")
-              (concat "?" url-request-data)
-            "")))
+  (let ((url
+         (concat magithub-api-base
+                 (if (stringp path) path (mapconcat 'url-hexify-string path "/"))
+                 (if (string= url-request-method "GET")
+                     (concat "?" url-request-data)
+                   ""))))
+    (if magithub-use-ssl url
+      (replace-regexp-in-string "^https" "http" url))))
 
 (defmacro magithub-with-auth (&rest body)
   "Runs BODY with GitHub authorization info in `magithub-request-data'."
