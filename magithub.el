@@ -195,7 +195,35 @@ The repos are lists of decoded JSON objects (plists)."
                nil))
         (push (cons user repos) -magithub-repos-cache)))
     repos))
-    
+
+(defun magithub-read-repo (&optional prompt)
+  "Read a GitHub user-repository pair with completion.
+Return (USERNAME . REPO), or nil if the user enters no input.
+PROMPT is a string to prompt with, defaulting to
+\"GitHub repo (user/repo): \".
+
+WARNING: This function currently doesn't work fully, since
+GitHub's user search API only returns 30 (apparently random)
+users, and also has no way to search for users whose names begin
+with certain characters."
+  (let ((-magithub-users-cache nil)
+        (-magithub-repos-cache nil))
+    (completing-read (or prompt "GitHub repo: ") '-magithub-complete-repo)))
+
+(defun -magithub-complete-repo (string predicate allp)
+  "Try completing the given GitHub user/repository pair.
+STRING is the text already in the minibuffer, PREDICATE is a
+predicate that the string must satisfy."
+  (destructuring-bind (username . rest) (split-string string "/")
+    (if (not rest) ;; Need to complete username before we start completing repo
+        (let ((usernames (mapcar (lambda (user) (concat (plist-get user :name) "/"))
+                                 (-magithub-users-for-prefix username))))
+          (if allp (all-completions username usernames predicate)
+            (try-completion username usernames predicate)))
+      (let ((repos (mapcar (lambda (repo) (concat username "/" (plist-get repo :name)))
+                           (-magithub-repos-for-user username))))
+        (if allp (all-completions string repos predicate)
+          (try-completion string repos predicate))))))
 
 ;;; Bindings
 
