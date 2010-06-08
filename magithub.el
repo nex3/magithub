@@ -245,6 +245,7 @@ predicate that the string must satisfy."
 
 (define-prefix-command 'magithub-prefix 'magithub-map)
 (define-key magithub-map (kbd "C") 'magithub-create-from-local)
+(define-key magithub-map (kbd "c") 'magithub-clone)
 (define-key magit-mode-map (kbd "'") 'magithub-prefix)
 
 
@@ -401,6 +402,20 @@ creates a private repo."
                          (message "GitHub repository created: %s"
                                   (plist-get (plist-get data :repository) :url)))
                        (list name))))
+
+(defun magithub-clone (username repo dir)
+  "Clone GitHub repo USERNAME/REPO into directory DIR.
+Once the repo is cloned, switch to a `magit-status' buffer for it.
+
+Interactively, prompts for the repo name and directory."
+  (interactive
+   (destructuring-bind (username . repo) (magithub-read-repo)
+     (list username repo (read-directory-name "Parent directory: "))))
+  ;; The trailing slash is necessary for Magit to be able to figure out
+  ;; that this is actually a directory, not a file
+  (let ((dir (concat (directory-file-name (expand-file-name dir)) "/" repo "/")))
+    (magit-run-git "clone" (concat "http://github.com/" username "/" repo ".git") dir)
+    (magit-status dir)))
 
 
 (provide 'magithub)
