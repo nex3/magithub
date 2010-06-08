@@ -252,6 +252,18 @@ predicate that the string must satisfy."
         (if allp (all-completions string repos predicate)
           (try-completion string repos predicate))))))
 
+(defun magithub-read-pull-request-recipients ()
+  "Read a list of recipients for a GitHub pull request."
+  (let ((collabs (magithub-repo-parent-collaborators))
+        (network (magithub-repo-network)))
+    (-magithub-remove-if
+     (lambda (s) (string= s ""))
+     (completing-read-multiple
+      "Send pull request to: "
+      (mapcar (lambda (repo) (plist-get repo :owner)) (magithub-repo-network))
+      nil nil (concat (mapconcat 'identity collabs crm-separator)
+                      (if (= (length collabs) (length network)) "" crm-separator))))))
+
 
 ;;; Bindings
 
@@ -476,6 +488,18 @@ Each fork is a decoded JSON object (plist)."
      (magithub-retrieve-synchronously
       (list "repos" "show" username repo "network"))
      :network)))
+
+(defun magithub-repo-parent-collaborators (&optional username repo)
+  "Return an array of names of collaborators on the parent of USERNAME/REPO.
+These are the default recipients of a pull request for this repo.
+Defaults to the current repo.
+
+If this repo has no parents, return the collaborators for it instead."
+  (let ((parent (plist-get (magithub-cached-repo-obj username repo) :parent)))
+    (if (not parent) (magithub-repo-collaborators username repo)
+      (destructuring-bind (parent-owner . parent-repo) (magithub-parse-repo parent)
+        (magithub-repo-collaborators parent-owner parent-repo)))))
+   
 
 
 ;;; Local Repo Information
