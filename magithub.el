@@ -161,10 +161,7 @@ begin with certain characters."
         (if users (cddr users) ;; We've cached the users for this prefix
           ;; We need to run a GitHub call to get more users
           (let* ((url-request-method "GET")
-                 (users (plist-get
-                         (magithub-retrieve-synchronously
-                          (list "user" "search" string))
-                         :users))
+                 (users (magithub-user-search string))
                  (matching-users (with-prefix users prefix)))
             ;; If the length is less than the max, then this is all users
             ;; with this substring in their usernames,
@@ -200,19 +197,14 @@ predicate that the string must satisfy."
 
 (defun -magithub-repos-for-user (user)
   "Returns a list of all repos owned by USER.
+The repos are decoded JSON objects (plists).
 
-The repos are lists of decoded JSON objects (plists)."
+This is like `magithub-repos-for-user' except that it uses
+`-magithub-repos-cache' and returns a list rather than an array."
   (let ((repos (cdr (assoc user -magithub-repos-cache))))
     (unless repos
-      (let* ((url-request-method "GET"))
-        (setq repos
-              (append ;; Convert to list
-               (plist-get
-                (magithub-retrieve-synchronously
-                 (list "repos" "show" user))
-                :repositories)
-               nil))
-        (push (cons user repos) -magithub-repos-cache)))
+      (setq repos (append (magithub-repos-for-user user) nil)) ;; Convert to list
+      (push (cons user repos) -magithub-repos-cache))
     repos))
 
 (defun magithub-read-repo (&optional prompt predicate require-match initial-input
@@ -400,7 +392,32 @@ for the info then sets it to the git config."
     (cons user token)))
 
 
-;;; Repo Information
+;;; GitHub Information
+
+(defun magithub-repos-for-user (user)
+  "Return an array of all repos owned by USER.
+The repos are decoded JSON objects (plists)."
+  (let ((url-request-method "GET"))
+    (plist-get
+     (magithub-retrieve-synchronously
+      (list "repos" "show" user))
+     :repositories)))
+
+(defun magithub-user-search (user)
+  "Run a GitHub user search for USER.
+Return an array of all matching users.
+
+WARNING: WARNING: This function currently doesn't work fully,
+since GitHub's user search API only returns an apparently random
+subset of users."
+  (let ((url-request-method "GET"))
+    (plist-get
+     (magithub-retrieve-synchronously
+      (list "user" "search" string))
+     :users)))
+
+
+;;; Local Repo Information
 
 (defun magithub-repo-info ()
   "Return information about this GitHub repo.
