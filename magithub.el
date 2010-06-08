@@ -220,7 +220,7 @@ begin with certain characters."
                                    initial-input hist def inherit-input-method)))
       (if (string= result "")
           (when require-match (error "No repository given"))
-        result))))
+        (magithub-parse-repo result)))))
 
 (defun -magithub-complete-repo (string predicate allp)
   "Try completing the given GitHub user/repository pair.
