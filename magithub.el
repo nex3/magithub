@@ -51,26 +51,6 @@ This should only ever be `let'-bound, not set outright.")
 (defvar magithub-repos-history nil
   "A list of repos selected via `magithub-read-repo'.")
 
-(defvar -magithub-users-cache nil
-  "An assoc list of username prefixes to users matching those prefixes.
-
-Each entry is of the form (PREFIX . USERS).  PREFIX is the string
-prefix of all users, and USERS is an array of decoded JSON
-responses from the GitHub API (plists).
-
-This cache is only maintained within a single call to
-`magithub-read-user'.")
-
-(defvar -magithub-repos-cache nil
-  "An assoc list from usernames to repos owned by those users.
-
-Each entry is of the form (USERNAME . REPOS), where REPOS is an
-array containing decoded JSON responses from the GitHub
-API (plists).
-
-This cache is only maintained within a single call to
-`magithub-read-repo'.")
-
 (defvar -magithub-repo-obj-cache (make-hash-table :test 'equal)
   "A hash from (USERNAME . REPONAME) to decoded JSON repo objects (plists).
 This caches the result of `magithub-repo-obj' and
@@ -85,6 +65,23 @@ Like `remove-if', but without the cl runtime dependency."
   (loop for el being the elements of seq
         if (not (funcall predicate el)) collect el into els
         finally return els))
+
+(defun -magithub-cache-function (fn)
+  "Return a lambda that will run FN but cache its return values.
+The cache is a very naive assoc from arguments to returns.
+The cache will only last as long as the lambda does.
+
+FN may call -magithub-use-cache, which will use a pre-cached
+value if available or recursively call FN if not."
+  (lexical-let ((fn fn) cache cache-fn)
+    (setq cache-fn
+          (lambda (&rest args)
+            (let ((cached (assoc args cache)))
+              (if cached (cdr cached)
+                (flet ((-magithub-use-cache (&rest args) (apply cache-fn args)))
+                  (let ((val (apply fn args)))
+                    (push (cons args val) cache)
+                    val))))))))
 
 (defun magithub-make-query-string (params)
   "Return a query string constructed from PARAMS.
@@ -112,6 +109,20 @@ incorrect."
 
 ;;; Reading Input
 
+(defun -magithub-lazy-completion-callback (fn &optional noarg)
+  "Converts a simple string-listing FN into a lazy-loading completion callback.
+FN should take a string (the contents of the minibuffer) and
+return a list of strings (the candidates for completion).  This
+method takes care of any caching and makes sure FN isn't called
+until completion needs to happen.
+
+If NOARG is non-nil, don't pass a string to FN."
+  (lexical-let ((fn (-magithub-cache-function fn)) (noarg noarg))
+    (lambda (string predicate allp)
+      (let ((strs (if noarg (funcall fn) (funcall fn string))))
+        (if allp (all-completions string strs predicate)
+          (try-completion string strs predicate))))))
+
 (defun magithub-read-user (&optional prompt predicate require-match initial-input
                                      hist def inherit-input-method)
   "Read a GitHub username from the minibuffer with completion.
@@ -123,52 +134,14 @@ defaults to \"GitHub user: \".  HIST defaults to
 
 WARNING: This function currently doesn't work fully, since
 GitHub's user search API only returns an apparently random subset
-of users, and also has no way to search for users whose names
-begin with certain characters."
+of users."
   (setq hist (or hist 'magithub-users-history))
-  (let ((-magithub-users-cache nil))
-    (completing-read (or prompt "GitHub user: ") '-magithub-complete-user predicate
-                     require-match initial-input hist def inherit-input-method)))
-
-(defun -magithub-complete-user (string predicate allp)
-  "Try completing the given GitHub username.
-STRING is the text already in the minibuffer, PREDICATE is a
-predicate that the string must satisfy."
-  (let ((usernames (mapcar (lambda (user) (plist-get user :name))
-                           (-magithub-users-for-prefix string))))
-    (if allp (all-completions string usernames predicate)
-      (try-completion string usernames predicate))))
-
-(defun -magithub-users-for-prefix (prefix)
-  "Return all GitHub users whose names begin with PREFIX.
-
-Users are returned as decoded JSON objects (plists) in an array.
-Caches the results in `-magithub-users-cache', which should be
-let-bound around a call to this function.
-
-WARNING: This function currently doesn't work fully, since
-GitHub's user search API only returns an apparently random subset
-of users, and also has no way to search for users whose names
-begin with certain characters."
-  (if (string= string "")
-      (if allp (all-completions "" '() predicate)
-        (try-completion "" '() predicate))
-    (flet ((with-prefix (users pfx)
-             (lexical-let ((pfx pfx))
-               (-magithub-remove-if
-                (lambda (user) (not (string-prefix-p pfx (plist-get user :name) 'ignore-case)))
-                users))))
-      (let ((users (assoc prefix -magithub-users-cache)))
-        (if users (cddr users) ;; We've cached the users for this prefix
-          ;; We need to run a GitHub call to get more users
-          (let* ((url-request-method "GET")
-                 (users (magithub-user-search string))
-                 (matching-users (with-prefix users prefix)))
-            ;; If the length is less than the max, then this is all users
-            ;; with this substring in their usernames,
-            ;; so we don't need to do more GitHub searches
-            (push (cons prefix matching-users) -magithub-users-cache)
-            matching-users))))))
+  (completing-read (or prompt "GitHub user: ")
+                   (-magithub-lazy-completion-callback
+                    (lambda (s)
+                      (mapcar (lambda (user) (plist-get user :name))
+                              (magithub-user-search s))))
+                   predicate require-match initial-input hist def inherit-input-method))
 
 (defun magithub-read-repo-for-user (user &optional prompt predicate require-match
                                          initial-input hist def inherit-input-method)
@@ -178,35 +151,15 @@ USER is the owner of the repository.
 PROMPT, PREDICATE, REQUIRE-MATCH, INITIAL-INPUT, HIST, DEF, and
 INHERIT-INPUT-METHOD work as in `completing-read'.  PROMPT
 defaults to \"GitHub repo: <user>/\"."
-  (let ((-magithub-repos-cache nil))
-    (lexical-let ((user user))
-      (completing-read (or prompt (concat "GitHub repo: " user "/"))
-                       (lambda (&rest args)
-                         (apply '-magithub-complete-repo-for-user user args))
-                       predicate require-match initial-input hist def
-                       inherit-input-method))))
-
-(defun -magithub-complete-repo-for-user (user string predicate allp)
-  "Try completing the given GitHub repository.
-USER is the owner of the repository
-STRING is the text already in the minibuffer, PREDICATE is a
-predicate that the string must satisfy."
-  (let ((repos (mapcar (lambda (repo) (plist-get repo :name))
-                       (-magithub-repos-for-user user))))
-    (if allp (all-completions string repos predicate)
-      (try-completion string repos predicate))))
-
-(defun -magithub-repos-for-user (user)
-  "Returns a list of all repos owned by USER.
-The repos are decoded JSON objects (plists).
-
-This is like `magithub-repos-for-user' except that it uses
-`-magithub-repos-cache' and returns a list rather than an array."
-  (let ((repos (cdr (assoc user -magithub-repos-cache))))
-    (unless repos
-      (setq repos (append (magithub-repos-for-user user) nil)) ;; Convert to list
-      (push (cons user repos) -magithub-repos-cache))
-    repos))
+  (lexical-let ((user user))
+    (completing-read (or prompt (concat "GitHub repo: " user "/"))
+                     (-magithub-lazy-completion-callback
+                      (lambda ()
+                        (mapcar (lambda (repo) (plist-get repo :name))
+                                (magithub-repos-for-user user)))
+                      'noarg)
+                     predicate require-match initial-input hist def
+                     inherit-input-method)))
 
 (defun magithub-read-repo (&optional prompt predicate require-match initial-input
                                      hist def inherit-input-method)
@@ -224,29 +177,26 @@ GitHub's user search API only returns an apparently random subset
 of users, and also has no way to search for users whose names
 begin with certain characters."
   (setq hist (or hist 'magithub-repos-history))
-  (let ((-magithub-users-cache nil)
-        (-magithub-repos-cache nil))
-    (let ((result (completing-read (or prompt "GitHub repo (user/repo): ")
-                                   '-magithub-complete-repo predicate require-match
-                                   initial-input hist def inherit-input-method)))
-      (if (string= result "")
-          (when require-match (error "No repository given"))
-        (magithub-parse-repo result)))))
+  (let ((result (completing-read
+                 (or prompt "GitHub repo (user/repo): ")
+                 (-magithub-lazy-completion-callback '-magithub-repo-completions)
+                 predicate require-match initial-input hist def inherit-input-method)))
+    (if (string= result "")
+        (when require-match (error "No repository given"))
+      (magithub-parse-repo result))))
 
-(defun -magithub-complete-repo (string predicate allp)
+(defun -magithub-repo-completions (string)
   "Try completing the given GitHub user/repository pair.
 STRING is the text already in the minibuffer, PREDICATE is a
 predicate that the string must satisfy."
   (destructuring-bind (username . rest) (split-string string "/")
     (if (not rest) ;; Need to complete username before we start completing repo
-        (let ((usernames (mapcar (lambda (user) (concat (plist-get user :name) "/"))
-                                 (-magithub-users-for-prefix username))))
-          (if allp (all-completions username usernames predicate)
-            (try-completion username usernames predicate)))
-      (let ((repos (mapcar (lambda (repo) (concat username "/" (plist-get repo :name)))
-                           (-magithub-repos-for-user username))))
-        (if allp (all-completions string repos predicate)
-          (try-completion string repos predicate))))))
+        (mapcar (lambda (user) (concat (plist-get user :name) "/"))
+                (magithub-user-search username))
+      (if (not (string= (car rest) ""))
+          (-magithub-use-cache (concat username "/"))
+        (mapcar (lambda (repo) (concat username "/" (plist-get repo :name)))
+                (magithub-repos-for-user username))))))
 
 (defun magithub-read-pull-request-recipients ()
   "Read a list of recipients for a GitHub pull request."
@@ -424,11 +374,12 @@ Return an array of all matching users.
 WARNING: WARNING: This function currently doesn't work fully,
 since GitHub's user search API only returns an apparently random
 subset of users."
-  (let ((url-request-method "GET"))
-    (plist-get
-     (magithub-retrieve-synchronously
-      (list "user" "search" string))
-     :users)))
+  (if (string= user "") []
+    (let ((url-request-method "GET"))
+      (plist-get
+       (magithub-retrieve-synchronously
+        (list "user" "search" string))
+       :users))))
 
 (defun magithub-repo-obj (&optional username repo)
   "Return an object representing the repo USERNAME/REPO.
@@ -718,9 +669,9 @@ printed as a message when the buffer is opened."
 
 (provide 'magithub)
 
-;;; magithub.el ends here
 ;;;###autoload
 (eval-after-load 'magit
   (unless (featurep 'magithub)
     (require 'magithub)))
 
+;;; magithub.el ends here
