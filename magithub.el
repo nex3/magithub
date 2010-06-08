@@ -240,6 +240,7 @@ predicate that the string must satisfy."
         (if allp (all-completions string repos predicate)
           (try-completion string repos predicate))))))
 
+
 ;;; Bindings
 
 (define-prefix-command 'magithub-prefix 'magithub-map)
