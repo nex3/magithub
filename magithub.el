@@ -464,6 +464,19 @@ Defaults to the current repo."
       (list "repos" "show" username repo "collaborators"))
      :collaborators)))
 
+(defun magithub-repo-network (&optional username repo)
+  "Return an array of forks and/or parents of USERNAME/REPO.
+Defaults to the current repo.
+
+Each fork is a decoded JSON object (plist)."
+  (setq username (or username (magithub-repo-owner)))
+  (setq repo (or repo (magithub-repo-name)))
+  (let ((url-request-method "GET"))
+    (plist-get
+     (magithub-retrieve-synchronously
+      (list "repos" "show" username repo "network"))
+     :network)))
+
 
 ;;; Local Repo Information
 
