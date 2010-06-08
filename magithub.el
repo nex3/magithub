@@ -39,6 +39,11 @@
 This is meant to be dynamically bound around `magithub-retrieve'
 and `magithub-retrieve-synchronously'.")
 
+(defvar magithub-parse-response t
+  "Whether to parse responses from GitHub as JSON.
+Used by `magithub-retrieve' and `magithub-retrieve-synchronously'.
+This should only ever be `let'-bound, not set outright.")
+
 (defvar magithub-users-history nil
   "A list of users selected via `magithub-read-user'.")
 
@@ -291,13 +296,15 @@ message is printed with `error'.  Otherwise, the HTTP error is
 signaled."
   (loop for (name val) on status by 'cddr
         do (when (eq name :error)
-             (condition-case err
-                 (let* ((json-object-type 'plist)
-                        (data (json-read))
-                        (err (plist-get data :error)))
-                   (unless err (signal 'json-readtable-error nil))
-                   (error "GitHub error: %s" err))
-               (json-readtable-error (signal (car val) (cdr val)))))))
+             (if (not magithub-handle-errors)
+                 (signal (var val) (cdr val))
+               (condition-case err
+                   (let* ((json-object-type 'plist)
+                          (data (json-read))
+                          (err (plist-get data :error)))
+                     (unless err (signal 'json-readtable-error nil))
+                     (error "GitHub error: %s" err))
+                 (json-readtable-error (signal (car val) (cdr val))))))))
 
 (defun magithub-retrieve (path callback &optional cbargs)
   "Retrieve GitHub API PATH asynchronously.
@@ -311,14 +318,21 @@ Like `url-retrieve', except for the following:
 * GitHub authorization is automatically enabled.
 * `magithub-request-data' is used instead of `url-request-data'.
 * CALLBACK is passed a decoded JSON object (as a plist) rather
-  than a list of statuses.  Basic error handling is done by `magithub-retrieve'."
+  than a list of statuses.  Basic error handling is done by `magithub-retrieve'.
+
+If `magithub-parse-response' is nil, CALLBACK is just passed nil
+rather than the JSON response object."
   (magithub-with-auth
     (let ((url-request-data (magithub-make-query-string magithub-request-data)))
       (url-retrieve (magit-request-url path)
                     (lambda (status callback &rest cbargs)
-                      (search-forward "\n\n" nil t) ; Move past headers
+                      (when magithub-parse-response
+                        (search-forward "\n\n" nil t)) ; Move past headers
                       (magithub-handle-errors status)
-                      (apply callback (let ((json-object-type 'plist)) (json-read)) cbargs))
+                      (apply callback
+                             (when magithub-parse-response
+                               (let ((json-object-type 'plist)) (json-read)))
+                             cbargs))
                     (cons callback cbargs)))))
 
 (defun magithub-retrieve-synchronously (path)
@@ -331,18 +345,19 @@ Like `url-retrieve-synchronously', except for the following:
 * PATH is an API resource path, not a full URL.
 * GitHub authorization is automatically enabled.
 * `magithub-request-data' is used instead of `url-request-data'.
-* Returns a decoded JSON object (as a plist) rather than a buffer
-  containing the response."
+* Return a decoded JSON object (as a plist) rather than a buffer
+  containing the response unless `magithub-parse-response' is nil."
   (magithub-with-auth
     (let ((url-request-data (magithub-make-query-string magithub-request-data)))
       (with-current-buffer (url-retrieve-synchronously (magit-request-url path))
         (goto-char (point-min))
-        (search-forward "\n\n" nil t) ; Move past headers
-        (let* ((data (let ((json-object-type 'plist)) (json-read)))
-               (err (plist-get data :error)))
-          (when err (error "GitHub error: %s" err))
-          (kill-buffer)
-          data)))))
+        (if (not magithub-parse-response) current-buffer
+          (search-forward "\n\n" nil t) ; Move past headers
+          (let* ((data (let ((json-object-type 'plist)) (json-read)))
+                 (err (plist-get data :error)))
+            (when err (error "GitHub error: %s" err))
+            (kill-buffer)
+            data))))))
 
 
 ;;; Configuration
