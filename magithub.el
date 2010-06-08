@@ -134,25 +134,28 @@ WARNING: This function currently doesn't work fully, since
 GitHub's user search API only returns an apparently random subset
 of users, and also has no way to search for users whose names
 begin with certain characters."
-  (flet ((with-prefix (users pfx)
-           (lexical-let ((pfx pfx))
-             (-magithub-remove-if
-              (lambda (user) (not (string-prefix-p pfx (plist-get user :name) 'ignore-case)))
-              users))))
-    (let ((users (assoc prefix -magithub-users-cache)))
-      (if users (cddr users) ;; We've cached the users for this prefix
-       ;; We need to run a GitHub call to get more users
-        (let* ((url-request-method "GET")
-               (users (plist-get
-                       (magithub-retrieve-synchronously
-                        (concat "user/search/" (url-hexify-string string)))
-                       :users))
-               (matching-users (with-prefix users prefix)))
-          ;; If the length is less than the max, then this is all users
-          ;; with this substring in their usernames,
-          ;; so we don't need to do more GitHub searches
-          (push (cons prefix matching-users) -magithub-users-cache)
-          matching-users)))))
+  (if (string= string "")
+      (if allp (all-completions "" '() predicate)
+        (try-completion "" '() predicate))
+    (flet ((with-prefix (users pfx)
+             (lexical-let ((pfx pfx))
+               (-magithub-remove-if
+                (lambda (user) (not (string-prefix-p pfx (plist-get user :name) 'ignore-case)))
+                users))))
+      (let ((users (assoc prefix -magithub-users-cache)))
+        (if users (cddr users) ;; We've cached the users for this prefix
+          ;; We need to run a GitHub call to get more users
+          (let* ((url-request-method "GET")
+                 (users (plist-get
+                         (magithub-retrieve-synchronously
+                          (concat "user/search/" (url-hexify-string string)))
+                         :users))
+                 (matching-users (with-prefix users prefix)))
+            ;; If the length is less than the max, then this is all users
+            ;; with this substring in their usernames,
+            ;; so we don't need to do more GitHub searches
+            (push (cons prefix matching-users) -magithub-users-cache)
+            matching-users))))))
 
 (defun magithub-read-repo-for-user (user &optional prompt predicate require-match
                                          initial-input hist def inherit-input-method)
