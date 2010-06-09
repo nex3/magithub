@@ -12,6 +12,7 @@
 ;; Package-Requires: ((magit "0.8") (json "1.2"))
 
 ;;; Commentary:
+
 ;; This package does two things.  First, it extends Magit's UI with
 ;; assorted GitHub-related functionality, similar to the github-gem
 ;; tool (http://github.com/defunkt/github-gem).  Second, Magithub uses
@@ -634,6 +635,7 @@ creates a private repo."
                                   (plist-get (plist-get data :repository) :url)))
                        (list name))))
 
+;;;###autoload
 (defun magithub-clone (username repo dir &optional sshp)
   "Clone GitHub repo USERNAME/REPO into directory DIR.
 If SSHP is non-nil, clone it using the SSH URL.  Once the repo is
