@@ -256,6 +256,7 @@ and return (USERNAME . REPONAME)."
 (define-key magithub-map (kbd "p") 'magithub-pull-request)
 (define-key magithub-map (kbd "t") 'magithub-track)
 (define-key magithub-map (kbd "g") 'magithub-gist-repo)
+(define-key magithub-map (kbd "S") 'magithub-toggle-ssh)
 (define-key magit-mode-map (kbd "'") 'magithub-prefix)
 
 
@@ -693,6 +694,16 @@ For non-interactive pull requests, see `magithub-send-pull-request'."
     (magit-log-edit-set-field
      'recipients (mapconcat 'identity recipients crm-separator)))
   (magithub-pop-to-message "send pull request"))
+
+(defun magithub-toggle-ssh (&optional arg)
+  "Toggle whether the current repo is checked out via SSH.
+With ARG, use SSH if and only if ARG is positive."
+  (interactive "P")
+  (if (null arg) (setq arg (if (magithub-repo-ssh-p) -1 1))
+    (setq arg (prefix-numeric-value arg)))
+  (magit-set (magithub-repo-url (magithub-repo-owner) (magithub-repo-name) (> arg 0))
+             "remote" "origin" "url")
+  (magit-refresh-status))
 
 
 ;;; Message Mode
