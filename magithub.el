@@ -116,6 +116,13 @@ incorrect."
         (cons username repo))
     (wrong-number-of-arguments (error "Invalid GitHub repository %s" repo))))
 
+(defun magithub-repo-url (username repo &optional sshp)
+  "Return the repository URL for USERNAME/REPO.
+If SSHP is non-nil, return the SSH URL instead.  Otherwise,
+return the HTTP URL."
+  (format (if sshp "git@github.com:%s/%s.git" "http://github.com/%s/%s.git")
+          username repo))
+
 
 ;;; Reading Input
 
@@ -546,8 +553,7 @@ arg, fetches the remote."
   (interactive
    (destructuring-bind (username . repo) (magithub-read-untracked-fork)
      (list username repo current-prefix-arg)))
-  (magit-run-git "remote" "add" username
-                 (format "http://github.com/%s/%s.git" username repo))
+  (magit-run-git "remote" "add" username (magithub-repo-url username repo))
   (when fetch (magit-run-git-async "remote" "update" username))
   (message "Tracking %s/%s%s" username repo
            (if fetch ", fetching..." "")))
@@ -619,8 +625,7 @@ creates a private repo."
                        (lambda (data name)
                          (magit-git-string
                           "remote" "add" "origin"
-                          (concat "git@github.com:" (magithub-config "user")
-                                  "/" name ".git"))
+                          (magithub-repo-url (magithub-config "user") name 'ssh))
                          (magit-set "origin" "branch" "master" "remote")
                          (magit-set "refs/heads/master" "branch" "master" "merge")
                          (magit-run-git-async "push" "-v" "origin" "master")
@@ -628,18 +633,20 @@ creates a private repo."
                                   (plist-get (plist-get data :repository) :url)))
                        (list name))))
 
-(defun magithub-clone (username repo dir)
+(defun magithub-clone (username repo dir &optional sshp)
   "Clone GitHub repo USERNAME/REPO into directory DIR.
-Once the repo is cloned, switch to a `magit-status' buffer for it.
+If SSHP is non-nil, clone it using the SSH URL.  Once the repo is
+cloned, switch to a `magit-status' buffer for it.
 
-Interactively, prompts for the repo name and directory."
+Interactively, prompts for the repo name and directory.  With a
+prefix arg, clone using SSH."
   (interactive
    (destructuring-bind (username . repo) (magithub-read-repo "Clone repo (user/repo): ")
-     (list username repo (read-directory-name "Parent directory: "))))
+     (list username repo (read-directory-name "Parent directory: ") current-prefix-arg)))
   ;; The trailing slash is necessary for Magit to be able to figure out
   ;; that this is actually a directory, not a file
   (let ((dir (concat (directory-file-name (expand-file-name dir)) "/" repo "/")))
-    (magit-run-git "clone" (concat "http://github.com/" username "/" repo ".git") dir)
+    (magit-run-git "clone" (magithub-repo-url username repo sshp) dir)
     (magit-status dir)))
 
 
@@ -653,7 +660,7 @@ Interactively, prompts for the repo name and directory."
       (magithub-retrieve (list "repos" "fork" owner repo)
                          (lambda (obj owner repo)
                            (magit-with-refresh
-                             (magit-set (concat "git@github.com:" owner "/" repo ".git")
+                             (magit-set (magithub-repo-url owner repo 'ssh)
                                         "remote" "origin" "url"))
                            (message "Forked %s/%s" owner repo))
                          (list owner repo)))))
