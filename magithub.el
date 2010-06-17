@@ -955,12 +955,82 @@ printed as a message when the buffer is opened."
   (with-magithub-message-mode (magit-log-edit-cancel-log-message)))
 
 
-;;; Hooks into Magit
+;;; Minor Mode
+
+(defvar magithub-minor-mode-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map (kbd "C-c ' b") 'magithub-browse-file)
+    map))
+
+(defvar magithub-status-buffer nil
+  "The Magit status buffer for the current buffer's Git repository.")
+(make-variable-buffer-local 'magithub-status-buffer)
+
+(define-minor-mode magithub-minor-mode
+  "Minor mode for files in a GitHub repository.
+
+\\{magithub-minor-mode-map}"
+  :keymap magithub-minor-mode-map)
+
+(defun magithub-try-enabling-minor-mode ()
+  "Activate `magithub-minor-mode' in this buffer if it's a Git buffer.
+This means it's visiting a Git-controlled file and a Magit buffer
+is open for that file's repo."
+  (block nil
+    (if magithub-minor-mode (return))
+    (unless buffer-file-name (return))
+    ;; Try to find the Magit status buffer for this file.
+    ;; If it doesn't exist, don't activate magithub-minor-mode.
+    (let* ((topdir (magit-get-top-dir (file-name-directory buffer-file-name)))
+           (status (magit-find-buffer 'status topdir)))
+      (unless status (return))
+      (magithub-minor-mode 1)
+      (setq magithub-status-buffer status))))
+
+(defun magithub-try-disabling-minor-mode ()
+  "Deactivate `magithub-minor-mode' in this buffer if it's no longer a Git buffer.
+See `magithub-try-enabling-minor-mode'."
+  (when (and magithub-minor-mode (buffer-live-p magithub-status-buffer))
+    (magithub-minor-mode -1)))
+
+(defun magithub-try-enabling-minor-mode-everywhere ()
+  "Run `magithub-try-enabling-minor-mode' on all buffers."
+  (dolist (buf (buffer-list))
+    (with-current-buffer buf (magithub-try-enabling-minor-mode))))
+
+(defun magithub-try-disabling-minor-mode-everywhere ()
+  "Run `magithub-try-disabling-minor-mode' on all buffers."
+  (dolist (buf (buffer-list))
+    (with-current-buffer buf (magithub-try-disabling-minor-mode))))
+
+(magithub-try-enabling-minor-mode-everywhere)
+
+
+;;; Hooks into Magit and Emacs
 
 (defadvice magit-init (after magithub-init-too (dir) activate)
   (when (y-or-n-p "Create GitHub repo? ")
     (let ((default-directory dir))
       (call-interactively 'magithub-create-from-local))))
+
+(defun magithub-magit-mode-hook ()
+  "Enable `magithub-minor-mode' in buffers that are now in a Magit repo.
+If the new `magit-mode' buffer is a status buffer, try enabling
+`magithub-minor-mode' in all buffers."
+  (when (eq magit-submode 'status)
+    (magithub-try-enabling-minor-mode-everywhere)))
+(add-hook 'magit-mode-hook 'magithub-magit-mode-hook)
+
+(defun magithub-kill-buffer-hook ()
+  "Clean up `magithub-minor-mode'.
+That is, if the buffer being killed is a Magit status buffer,
+deactivate `magithub-minor-mode' on all buffers in its repository."
+  (when (and (eq major-mode 'magit-mode) (eq magit-submode 'status))
+    (magithub-try-disabling-minor-mode-everywhere)))
+(add-hook 'kill-buffer-hook 'magithub-kill-buffer-hook)
+
+(add-hook 'find-file-hook 'magithub-try-enabling-minor-mode)
+
 
 (provide 'magithub)
 
