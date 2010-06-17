@@ -687,20 +687,51 @@ This must be a hunk for `magit-currently-shown-commit'."
                                               (magit-current-section)))
              (if l (format "L%d" l) (format "R%d" r))))))
 
+(defun magithub-browse-compare (from to &optional anchor)
+  "Show the GitHub webpage comparing refs FROM and TO.
+
+If ANCHOR is given, it's used as the anchor in the URL."
+  (magithub-browse-current
+   "compare" (format "%s...%s" (magit-name-rev from) (magit-name-rev to))
+   :anchor anchor))
+
+(defun magithub-browse-diffbuff (&optional anchor)
+  "Show the GitHub webpage comparing refs corresponding to the current diff buffer.
+
+If ANCHOR is given, it's used as the anchor in the URL."
+  (magithub-browse-compare (caar magit-refresh-args) (cdar magit-refresh-args) anchor))
+
+(defun magithub-browse-diff (section)
+  "Show the GitHub webpage for the diff displayed in DIFF-SECTION.
+This must be a diff from a *magit-diff* buffer."
+  (magithub-browse-diffbuff (format "diff-%d" (magithub-section-index diff-section))))
+
+(defun magithub-browse-hunk-at-point ()
+  "Show the GitHub webpage for the hunk at point.
+This must be a hunk from a *magit-diff* buffer."
+  (destructuring-bind (l r) (magithub-hunk-lines)
+    (magithub-browse-diffbuff
+     (format "L%d%s" (magithub-section-index (magit-section-parent
+                                              (magit-current-section)))
+             (if l (format "L%d" l) (format "R%d" r))))))
+
 (defun magithub-browse-item ()
   "Load a GitHub webpage describing the item at point."
   (interactive)
   (magit-section-action (item info "browse")
     ((commit) (magithub-browse-commit info))
     ((diff)
-     (when (eq magit-submode 'commit)
-       (magithub-browse-commit-diff (magit-current-section))))
+     (case magit-submode
+       (commit (magithub-browse-commit-diff (magit-current-section)))
+       (diff (magithub-browse-diff (magit-current-section)))))
     ((hunk)
-     (when (eq magit-submode 'commit)
-       (magithub-browse-commit-hunk-at-point)))
+     (case magit-submode
+       (commit (magithub-browse-commit-hunk-at-point))
+       (diff (magithub-browse-hunk-at-point))))
     (t
      (case magit-submode
        (commit (magithub-browse-commit magit-currently-shown-commit))
+       (diff (magithub-browse-diffbuff))
        (t (magithub-browse-current))))))
 
 
