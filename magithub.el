@@ -603,8 +603,11 @@ unknown format), return nil."
   (block nil
     (let ((point (point)))
       (save-excursion
-        (goto-char (magit-section-beginning (magit-current-section)))
         (beginning-of-line)
+        (when (looking-at "@@") ;; Annotations don't have line numbers,
+          (forward-line)        ;; so we'll approximate with the next line.
+          (setq point (point)))
+        (goto-char (magit-section-beginning (magit-current-section)))
         (unless (looking-at "@@ -\\([0-9]+\\),[0-9]+ \\+\\([0-9]+\\)") (return))
         (let ((l (- (string-to-number (match-string 1)) 2))
               (r (- (string-to-number (match-string 2)) 2)))
