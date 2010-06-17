@@ -647,7 +647,7 @@ arg, fetches the remote."
 ;;; Browsing
 
 (defun magithub-browse (&rest path-and-anchor)
-  "Load http://github.com/PATH#ANCHOR in a web browser.
+  "Load http://github.com/PATH#ANCHOR in a web browser and add it to the kill ring.
 
 \n(fn &rest PATH [:anchor ANCHOR])"
   (destructuring-bind (path anchor)
@@ -657,6 +657,7 @@ arg, fetches the remote."
             finally return (list path nil))
     (let ((url (concat "http://github.com/" (mapconcat 'identity path "/"))))
       (when anchor (setq url (concat url "#" anchor)))
+      (kill-new url)
       (browse-url url))))
 
 (defun magithub-browse-current (&rest path-and-anchor)
@@ -729,7 +730,8 @@ If ANCHOR is given, it's used as the anchor in the URL."
   (magithub-browse-current "blob" (magit-name-rev "HEAD") path :anchor anchor))
 
 (defun magithub-browse-item ()
-  "Load a GitHub webpage describing the item at point."
+  "Load a GitHub webpage describing the item at point.
+The URL of the webpage is added to the kill ring."
   (interactive)
   (magit-section-action (item info "browse")
     ((commit) (magithub-browse-commit info))
@@ -749,7 +751,8 @@ If ANCHOR is given, it's used as the anchor in the URL."
 
 (defun magithub-browse-file ()
   "Show the GitHub webpage for the current file.
-This only works within `magithub-minor-mode'.
+The URL for the webpage is added to the kill ring.  This only
+works within `magithub-minor-mode'.
 
 In Transient Mark mode, if the mark is active, highlight the
 contents of the region."
