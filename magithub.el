@@ -301,6 +301,7 @@ and return (USERNAME . REPONAME)."
 (define-key magithub-map (kbd "t") 'magithub-track)
 (define-key magithub-map (kbd "g") 'magithub-gist-repo)
 (define-key magithub-map (kbd "S") 'magithub-toggle-ssh)
+(define-key magithub-map (kbd "b") 'magithub-browse-item)
 (define-key magit-mode-map (kbd "'") 'magithub-prefix)
 
 
@@ -592,6 +593,39 @@ arg, fetches the remote."
   (when fetch (magit-run-git-async "remote" "update" username))
   (message "Tracking %s/%s%s" username repo
            (if fetch ", fetching..." "")))
+
+
+;;; Browsing
+
+(defun magithub-browse (&rest path-and-anchor)
+  "Load http://github.com/PATH#ANCHOR in a web browser.
+
+\n(fn &rest PATH [:anchor ANCHOR])"
+  (destructuring-bind (path anchor)
+      (loop for el on path-and-anchor
+            unless (eq (car el) :anchor) collect (car el) into path
+            else return (list path (cadr el))
+            finally return (list path nil))
+    (let ((url (concat "http://github.com/" (mapconcat 'identity path "/"))))
+      (when anchor (setq url (concat url "#" anchor)))
+      (browse-url url))))
+
+(defun magithub-browse-current (&rest path-and-anchor)
+  "Load http://github.com/USER/REPO/PATH#ANCHOR in a web browser.
+With ANCHOR, loads the URL with that anchor.
+
+USER is `magithub-repo-owner' and REPO is `magithub-repo-name'.
+
+\n(fn &rest PATH [:anchor ANCHOR])"
+  (apply 'magithub-browse (magithub-repo-owner) (magithub-repo-name) path-and-anchor))
+
+(defun magithub-browse-item ()
+  "Load a GitHub webpage describing the item at point."
+  (interactive)
+  (magit-section-action (item info "browse")
+    ((commit)
+     (destructuring-bind (user repo . _) (magithub-remote-info-for-commit info)
+       (magithub-browse user repo "commit" info)))))
 
 
 ;;; Creating Repos
