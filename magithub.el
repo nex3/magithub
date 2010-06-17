@@ -174,6 +174,13 @@ the priority is nondeterministic."
   (let ((remote (magithub-remote-for-commit commit)))
     (when remote (magithub-remote-info remote))))
 
+(defun magithub-repo-relative-path ()
+  "Return the path to the current file relative to the repository root.
+Only works within `magithub-minor-mode'."
+  (let ((filename buffer-file-name))
+    (with-current-buffer magithub-status-buffer
+      (file-relative-name filename default-directory))))
+
 
 ;;; Reading Input
 
@@ -733,6 +740,14 @@ This must be a hunk from a *magit-diff* buffer."
        (commit (magithub-browse-commit magit-currently-shown-commit))
        (diff (magithub-browse-diffbuff))
        (t (magithub-browse-current))))))
+
+(defun magithub-browse-file ()
+  "Show the GitHub webpage for the current file.
+This only works within `magithub-minor-mode'."
+  (interactive)
+  (let ((path (magithub-repo-relative-path)))
+    (with-current-buffer magithub-status-buffer
+      (magithub-browse-current "blob" (magit-name-rev "HEAD") path))))
 
 
 ;;; Creating Repos
