@@ -556,6 +556,7 @@ Returned repos are decoded JSON objects (plists)."
      (lambda (repo) (member-ignore-case (plist-get repo :owner) remotes))
      (magithub-repo-network))))
 
+
 ;;; Local Repo Information
 
 (defun magithub-repo-info ()
@@ -583,6 +584,36 @@ Error out if this isn't a GitHub repo."
 
 Error out if this isn't a GitHub repo."
   (caddr (magithub-repo-info)))
+
+
+;;; Diff Information
+
+(defun magithub-section-index (section)
+  "Return the index of SECTION as a child of its parent section."
+  (-magithub-position section (magit-section-children (magit-section-parent section))))
+
+(defun magithub-hunk-lines ()
+  "Return the two line numbers for the current line (which should be in a hunk).
+The first number is the line number in the original file, the
+second is the line number in the new file.  They're returned
+as (L1 L2).  If either doesn't exist, it will be nil.
+
+If something goes wrong (e.g. we're not in a hunk or it's in an
+unknown format), return nil."
+  (block nil
+    (let ((point (point)))
+      (save-excursion
+        (goto-char (magit-section-beginning (magit-current-section)))
+        (beginning-of-line)
+        (unless (looking-at "@@ -\\([0-9]+\\),[0-9]+ \\+\\([0-9]+\\)") (return))
+        (let ((l (- (string-to-number (match-string 1)) 2))
+              (r (- (string-to-number (match-string 2)) 2)))
+          (while (<= (point) point)
+            (forward-line)
+            (unless (looking-at "\\+") (incf l))
+            (unless (looking-at "-") (incf r)))
+          (forward-line -1)
+          (list (unless (looking-at "\\+") l) (unless (looking-at "-") r)))))))
 
 
 ;;; Network
@@ -641,11 +672,16 @@ If ANCHOR is given, it's used as the anchor in the URL."
   (magit-section-action (item info "browse")
     ((commit) (magithub-browse-commit info))
     ((diff)
-     (let* ((sect (magit-current-section))
-            (diff-number (-magithub-position sect (magit-section-children
-                                                   (magit-section-parent sect))))
-            (anchor (format "diff-%d" diff-number)))
-     (magithub-browse-commit magit-currently-shown-commit anchor)))
+     (magithub-browse-commit
+      magit-currently-shown-commit
+      (format "diff-%d" (magithub-section-index (magit-current-section)))))
+    ((hunk)
+     (destructuring-bind (l r) (magithub-hunk-lines)
+       (magithub-browse-commit
+        magit-currently-shown-commit
+        (format "L%d%s" (magithub-section-index (magit-section-parent
+                                                 (magit-current-section)))
+                (if l (format "L%d" l) (format "R%d" r))))))
     (t
      (case magit-submode
        (commit (magithub-browse-commit magit-currently-shown-commit))
