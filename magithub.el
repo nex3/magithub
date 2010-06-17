@@ -669,14 +669,16 @@ If ANCHOR is given, it's used as the anchor in the URL."
     (if info (magithub-browse (car info) (cadr info) "commit" commit :anchor anchor)
       (error "Commit %s hasn't been pushed" (substring commit 0 8)))))
 
-(defun magithub-browse-diff (diff-section)
-  "Show the GitHub webpage for the diff displayed in DIFF-SECTION."
+(defun magithub-browse-commit-diff (diff-section)
+  "Show the GitHub webpage for the diff displayed in DIFF-SECTION.
+This must be a diff for `magit-currently-shown-commit'."
   (magithub-browse-commit
    magit-currently-shown-commit
    (format "diff-%d" (magithub-section-index diff-section))))
 
-(defun magithub-browse-hunk-at-point ()
-  "Show the GitHub webpage for the hunk at point."
+(defun magithub-browse-commit-hunk-at-point ()
+  "Show the GitHub webpage for the hunk at point.
+This must be a hunk for `magit-currently-shown-commit'."
   (destructuring-bind (l r) (magithub-hunk-lines)
     (magithub-browse-commit
      magit-currently-shown-commit
@@ -689,8 +691,12 @@ If ANCHOR is given, it's used as the anchor in the URL."
   (interactive)
   (magit-section-action (item info "browse")
     ((commit) (magithub-browse-commit info))
-    ((diff) (magithub-browse-diff (magit-current-section)))
-    ((hunk) (magithub-browse-hunk-at-point))
+    ((diff)
+     (when (eq magit-submode 'commit)
+       (magithub-browse-commit-diff (magit-current-section))))
+    ((hunk)
+     (when (eq magit-submode 'commit)
+       (magithub-browse-commit-hunk-at-point)))
     (t
      (case magit-submode
        (commit (magithub-browse-commit magit-currently-shown-commit))
