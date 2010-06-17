@@ -619,16 +619,22 @@ USER is `magithub-repo-owner' and REPO is `magithub-repo-name'.
 \n(fn &rest PATH [:anchor ANCHOR])"
   (apply 'magithub-browse (magithub-repo-owner) (magithub-repo-name) path-and-anchor))
 
+(defun magithub-browse-commit (commit)
+  "Show the GitHub webpage for COMMIT.
+COMMIT should be the SHA of a commit."
+  (let ((info (magithub-remote-info-for-commit commit)))
+    (if info (magithub-browse (car info) (cadr info) "commit" commit)
+      (error "Commit %s hasn't been pushed" (substring commit 0 8)))))
+
 (defun magithub-browse-item ()
   "Load a GitHub webpage describing the item at point."
   (interactive)
   (magit-section-action (item info "browse")
-    ((commit)
-     (let ((repo (magithub-remote-info-for-commit info)))
-       (if repo (magithub-browse (car repo) (cadr repo) "commit" info)
-         (error "Commit %s hasn't been pushed" (substring info 0 8)))))
-    ((status)
-     (magithub-browse-current))))
+    ((commit) (magithub-browse-commit info))
+    (t
+     (case magit-submode
+       (commit (magithub-browse-commit magit-currently-shown-commit))
+       (t (magithub-browse-current))))))
 
 
 ;;; Creating Repos
