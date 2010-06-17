@@ -722,6 +722,12 @@ This must be a hunk from a *magit-diff* buffer."
                                               (magit-current-section)))
              (if l (format "L%d" l) (format "R%d" r))))))
 
+(defun magithub-browse-blob (path &optional anchor)
+  "Show the GitHub webpage for the blob at PATH.
+
+If ANCHOR is given, it's used as the anchor in the URL."
+  (magithub-browse-current "blob" (magit-name-rev "HEAD") path :anchor anchor))
+
 (defun magithub-browse-item ()
   "Load a GitHub webpage describing the item at point."
   (interactive)
@@ -743,11 +749,20 @@ This must be a hunk from a *magit-diff* buffer."
 
 (defun magithub-browse-file ()
   "Show the GitHub webpage for the current file.
-This only works within `magithub-minor-mode'."
+This only works within `magithub-minor-mode'.
+
+In Transient Mark mode, if the mark is active, highlight the
+contents of the region."
   (interactive)
-  (let ((path (magithub-repo-relative-path)))
+  (let ((path (magithub-repo-relative-path))
+        (start (line-number-at-pos (region-beginning)))
+        (end (line-number-at-pos (region-end))))
+    (when (eq (char-before (region-end)) ?\n) (decf end))
     (with-current-buffer magithub-status-buffer
-      (magithub-browse-current "blob" (magit-name-rev "HEAD") path))))
+      (magithub-browse-blob
+       path (when (and transient-mark-mode mark-active)
+              (if (eq start end) (format "L%d" start)
+                (format "L%d-%d" start end)))))))
 
 
 ;;; Creating Repos
