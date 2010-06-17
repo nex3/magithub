@@ -124,6 +124,49 @@ return the HTTP URL."
   (format (if sshp "git@github.com:%s/%s.git" "http://github.com/%s/%s.git")
           username repo))
 
+(defun magithub-remote-info (remote)
+  "Return (USERNAME REPONAME SSHP) for the given REMOTE.
+Return nil if REMOTE isn't a GitHub remote.
+
+USERNAME is the owner of the repo, REPONAME is the name of the
+repo, and SSH is non-nil if it's checked out via SSH."
+  (block nil
+    (let ((url (magit-get "remote" remote "url")))
+      (unless url (return))
+      (when (string-match "\\(?:git\\|http\\)://github\\.com/\\(.*?\\)/\\(.*\\)\.git" url)
+        (return (list (match-string 1 url) (match-string 2 url) nil)))
+      (when (string-match "git@github\\.com:\\(.*?\\)/\\(.*\\)\\.git" url)
+        (return (list (match-string 1 url) (match-string 2 url) t)))
+      (return))))
+
+(defun magithub-remote-for-commit (commit)
+  "Return the name of the remote that contains COMMIT.
+If no remote does, return nil.  COMMIT should be the full SHA1
+commit hash.
+
+If origin contains the commit, it takes precedence.  Otherwise
+the priority is nondeterministic."
+  (flet ((name-rev (remote commit)
+           (magit-git-string "name-rev" "--name-only" "--no-undefined" "--refs"
+                             ;; I'm not sure why the initial * is required,
+                             ;; but if it's not there this always returns nil
+                             (format "*remotes/%s/*" remote) commit)))
+    (let ((remote (or (name-rev "origin" commit) (name-rev "*" commit))))
+      (when (and remote (string-match "^remotes/\\(.*?\\)/" remote))
+        (match-string 1 remote)))))
+
+(defun magithub-remote-info-for-commit (commit)
+  "Return information about the GitHub repo for the remote that contains COMMIT.
+If no remote does, return nil.  COMMIT should be the full SHA1
+commit hash.
+
+The information is of the form returned by `magithub-remote-info'.
+
+If origin contains the commit, it takes precedence.  Otherwise
+the priority is nondeterministic."
+  (let ((remote (magithub-remote-for-commit commit)))
+    (when remote (magithub-remote-info remote))))
+
 
 ;;; Reading Input
 
@@ -509,21 +552,11 @@ Returned repos are decoded JSON objects (plists)."
 
 (defun magithub-repo-info ()
   "Return information about this GitHub repo.
-This is of the form (USERNAME REPONAME SSH).  USERNAME is the
-owner of the repo, REPONAME is the name of the repo, and SSH
-is non-nil if it's checked out via SSH.
+This is of the form given by `magithub-remote-info'.
 
 Error out if this isn't a GitHub repo."
-  (or
-   (block nil
-     (let ((url (magit-get "remote" "origin" "url")))
-       (unless url (return))
-       (when (string-match "\\(?:git\\|http\\)://github\\.com/\\(.*?\\)/\\(.*\\)\.git" url)
-         (return (list (match-string 1 url) (match-string 2 url) nil)))
-       (when (string-match "git@github\\.com:\\(.*?\\)/\\(.*\\)\\.git" url)
-         (return (list (match-string 1 url) (match-string 2 url) t)))
-       (return)))
-   (error "Not in a GitHub repo")))
+  (or (magithub-remote-info "origin")
+      (error "Not in a GitHub repo")))
 
 (defun magithub-repo-owner ()
   "Return the name of the owner of this GitHub repo.
