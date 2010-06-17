@@ -666,15 +666,18 @@ If ANCHOR is given, it's used as the anchor in the URL."
     (if info (magithub-browse (car info) (cadr info) "commit" commit :anchor anchor)
       (error "Commit %s hasn't been pushed" (substring commit 0 8)))))
 
+(defun magithub-browse-diff (diff-section)
+  "Show the GitHub webpage for the diff displayed in DIFF-SECTION."
+  (magithub-browse-commit
+   magit-currently-shown-commit
+   (format "diff-%d" (magithub-section-index diff-section))))
+
 (defun magithub-browse-item ()
   "Load a GitHub webpage describing the item at point."
   (interactive)
   (magit-section-action (item info "browse")
     ((commit) (magithub-browse-commit info))
-    ((diff)
-     (magithub-browse-commit
-      magit-currently-shown-commit
-      (format "diff-%d" (magithub-section-index (magit-current-section)))))
+    ((diff) (magithub-browse-diff (magit-current-section)))
     ((hunk)
      (destructuring-bind (l r) (magithub-hunk-lines)
        (magithub-browse-commit
