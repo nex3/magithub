@@ -77,6 +77,13 @@ Like `remove-if', but without the cl runtime dependency."
         if (not (funcall predicate el)) collect el into els
         finally return els))
 
+(defun -magithub-position (item seq)
+  "Return the index of ITEM in SEQ.
+Like `position', but without the cl runtime dependency.
+
+Comparison is done with `eq'."
+  (loop for el in seq until (eq el item) count t))
+
 (defun -magithub-cache-function (fn)
   "Return a lambda that will run FN but cache its return values.
 The cache is a very naive assoc from arguments to returns.
@@ -619,11 +626,13 @@ USER is `magithub-repo-owner' and REPO is `magithub-repo-name'.
 \n(fn &rest PATH [:anchor ANCHOR])"
   (apply 'magithub-browse (magithub-repo-owner) (magithub-repo-name) path-and-anchor))
 
-(defun magithub-browse-commit (commit)
+(defun magithub-browse-commit (commit &optional anchor)
   "Show the GitHub webpage for COMMIT.
-COMMIT should be the SHA of a commit."
+COMMIT should be the SHA of a commit.
+
+If ANCHOR is given, it's used as the anchor in the URL."
   (let ((info (magithub-remote-info-for-commit commit)))
-    (if info (magithub-browse (car info) (cadr info) "commit" commit)
+    (if info (magithub-browse (car info) (cadr info) "commit" commit :anchor anchor)
       (error "Commit %s hasn't been pushed" (substring commit 0 8)))))
 
 (defun magithub-browse-item ()
@@ -631,6 +640,12 @@ COMMIT should be the SHA of a commit."
   (interactive)
   (magit-section-action (item info "browse")
     ((commit) (magithub-browse-commit info))
+    ((diff)
+     (let* ((sect (magit-current-section))
+            (diff-number (-magithub-position sect (magit-section-children
+                                                   (magit-section-parent sect))))
+            (anchor (format "diff-%d" diff-number)))
+     (magithub-browse-commit magit-currently-shown-commit anchor)))
     (t
      (case magit-submode
        (commit (magithub-browse-commit magit-currently-shown-commit))
