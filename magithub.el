@@ -672,19 +672,22 @@ If ANCHOR is given, it's used as the anchor in the URL."
    magit-currently-shown-commit
    (format "diff-%d" (magithub-section-index diff-section))))
 
+(defun magithub-browse-hunk-at-point ()
+  "Show the GitHub webpage for the hunk at point."
+  (destructuring-bind (l r) (magithub-hunk-lines)
+    (magithub-browse-commit
+     magit-currently-shown-commit
+     (format "L%d%s" (magithub-section-index (magit-section-parent
+                                              (magit-current-section)))
+             (if l (format "L%d" l) (format "R%d" r))))))
+
 (defun magithub-browse-item ()
   "Load a GitHub webpage describing the item at point."
   (interactive)
   (magit-section-action (item info "browse")
     ((commit) (magithub-browse-commit info))
     ((diff) (magithub-browse-diff (magit-current-section)))
-    ((hunk)
-     (destructuring-bind (l r) (magithub-hunk-lines)
-       (magithub-browse-commit
-        magit-currently-shown-commit
-        (format "L%d%s" (magithub-section-index (magit-section-parent
-                                                 (magit-current-section)))
-                (if l (format "L%d" l) (format "R%d" r))))))
+    ((hunk) (magithub-browse-hunk-at-point))
     (t
      (case magit-submode
        (commit (magithub-browse-commit magit-currently-shown-commit))
