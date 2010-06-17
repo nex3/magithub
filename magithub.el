@@ -624,8 +624,11 @@ USER is `magithub-repo-owner' and REPO is `magithub-repo-name'.
   (interactive)
   (magit-section-action (item info "browse")
     ((commit)
-     (destructuring-bind (user repo . _) (magithub-remote-info-for-commit info)
-       (magithub-browse user repo "commit" info)))))
+     (let ((repo (magithub-remote-info-for-commit info)))
+       (if repo (magithub-browse (car repo) (cadr repo) "commit" info)
+         (error "Commit %s hasn't been pushed" (substring info 0 8)))))
+    ((status)
+     (magithub-browse-current))))
 
 
 ;;; Creating Repos
