@@ -868,12 +868,15 @@ prefix arg, clone using SSH."
   (destructuring-bind (owner repo _) (magithub-repo-info)
     (let ((url-request-method "POST"))
       (magithub-retrieve (list "repos" "fork" owner repo)
-                         (lambda (obj owner repo)
-                           (magit-with-refresh
-                             (magit-set (magithub-repo-url owner repo 'ssh)
-                                        "remote" "origin" "url"))
+                         (lambda (obj repo buffer)
+                           (with-current-buffer buffer
+                             (magit-with-refresh
+                               (magit-set (magithub-repo-url
+                                           (car (magithub-auth-info))
+                                           repo 'ssh)
+                                          "remote" "origin" "url")))
                            (message "Forked %s/%s" owner repo))
-                         (list owner repo)))))
+                         (list repo (current-buffer))))))
 
 (defun magithub-send-pull-request (text recipients)
   "Send a pull request with text TEXT to RECIPIENTS.
