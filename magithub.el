@@ -739,21 +739,22 @@ If ANCHOR is given, it's used as the anchor in the URL."
   "Load a GitHub webpage describing the item at point.
 The URL of the webpage is added to the kill ring."
   (interactive)
-  (magit-section-action (item info "browse")
-    ((commit) (magithub-browse-commit info))
-    ((diff)
-     (case magit-submode
-       (commit (magithub-browse-commit-diff (magit-current-section)))
-       (diff (magithub-browse-diff (magit-current-section)))))
-    ((hunk)
-     (case magit-submode
-       (commit (magithub-browse-commit-hunk-at-point))
-       (diff (magithub-browse-hunk-at-point))))
-    (t
-     (case magit-submode
-       (commit (magithub-browse-commit magit-currently-shown-commit))
-       (diff (magithub-browse-diffbuff))
-       (t (magithub-browse-repo))))))
+  (or
+   (magit-section-action (item info "browse")
+     ((commit) (magithub-browse-commit info))
+     ((diff)
+      (case magit-submode
+        (commit (magithub-browse-commit-diff (magit-current-section)))
+        (diff (magithub-browse-diff (magit-current-section)))))
+     ((hunk)
+      (case magit-submode
+        (commit (magithub-browse-commit-hunk-at-point))
+        (diff (magithub-browse-hunk-at-point))))
+     (t
+      (case magit-submode
+        (commit (magithub-browse-commit magit-currently-shown-commit))
+        (diff (magithub-browse-diffbuff)))))
+   (magithub-browse-repo)))
 
 (defun magithub-browse-file ()
   "Show the GitHub webpage for the current file.
