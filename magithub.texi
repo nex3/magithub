@@ -111,4 +111,12 @@ This will create a fork on GitHub and set that fork up as the default remote rep
 @node GitHub Network
 @chapter GitHub Network
 
+@section Tracking
+
+You can track a user's fork of your repository by typing @kbd{' t}
+and providing the user's name, and the name of the repository
+if it's different than your repository's name.
+This adds a remote named after the user tracking their fork.
+With a prefix argument, it fetches the remote as well.
+
 @bye
