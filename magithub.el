@@ -648,12 +648,14 @@ arg, fetches the remote."
 
 (defun magithub-browse (&rest path-and-anchor)
   "Load http://github.com/PATH#ANCHOR in a web browser and add it to the kill ring.
+Any nil elements of PATH are ignored.
 
 \n(fn &rest PATH [:anchor ANCHOR])"
   (destructuring-bind (path anchor)
       (loop for el on path-and-anchor
-            unless (eq (car el) :anchor) collect (car el) into path
-            else return (list path (cadr el))
+            if (car el)
+              unless (eq (car el) :anchor) collect (car el) into path
+              else return (list path (cadr el))
             finally return (list path nil))
     (let ((url (concat "http://github.com/" (mapconcat 'identity path "/"))))
       (when anchor (setq url (concat url "#" anchor)))
