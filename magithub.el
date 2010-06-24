@@ -671,6 +671,10 @@ USER is `magithub-repo-owner' and REPO is `magithub-repo-name'.
 \n(fn &rest PATH [:anchor ANCHOR])"
   (apply 'magithub-browse (magithub-repo-owner) (magithub-repo-name) path-and-anchor))
 
+(defun magithub-browse-repo ()
+  "Show the GitHub webpage for the current branch of this repository."
+  (magithub-browse-current "tree" (magit-name-rev "HEAD")))
+
 (defun magithub-browse-commit (commit &optional anchor)
   "Show the GitHub webpage for COMMIT.
 COMMIT should be the SHA of a commit.
@@ -749,7 +753,7 @@ The URL of the webpage is added to the kill ring."
      (case magit-submode
        (commit (magithub-browse-commit magit-currently-shown-commit))
        (diff (magithub-browse-diffbuff))
-       (t (magithub-browse-current))))))
+       (t (magithub-browse-repo))))))
 
 (defun magithub-browse-file ()
   "Show the GitHub webpage for the current file.
