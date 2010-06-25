@@ -199,7 +199,8 @@ and errors out on local-only revs."
            (equal (match-string 2 rev) remote))
       (match-string 3 rev)
     (unless (magithub-remote-contains-p remote rev)
-      (error "GitHub repo doesn't know about `%s'" rev))
+      (error "Commiy %s hasn't been pushed"
+             (substring (magit-git-string "rev-parse" rev) 0 8)))
     (cond
      ;; Assume the GitHub repo will have all the same tags as we do,
      ;; since we can't actually check without performing an HTTP request.
@@ -712,6 +713,8 @@ USER is `magithub-repo-owner' and REPO is `magithub-repo-name'.
 
 (defun magithub-browse-repo ()
   "Show the GitHub webpage for the current branch of this repository."
+  ;; Don't use name-rev-for-remote here because we want it to work
+  ;; even if the branches are out-of-sync.
   (magithub-browse-current "tree" (magit-name-rev "HEAD")))
 
 (defun magithub-browse-commit (commit &optional anchor)
@@ -745,7 +748,9 @@ This must be a hunk for `magit-currently-shown-commit'."
 
 If ANCHOR is given, it's used as the anchor in the URL."
   (magithub-browse-current
-   "compare" (format "%s...%s" (magit-name-rev from) (magit-name-rev to))
+   "compare" (format "%s...%s"
+                     (magithub-name-rev-for-remote from "origin")
+                     (magithub-name-rev-for-remote to "origin"))
    :anchor anchor))
 
 (defun magithub-browse-diffbuff (&optional anchor)
@@ -758,7 +763,9 @@ If ANCHOR is given, it's used as the anchor in the URL."
       (progn
         (unless (magit-everything-clean-p)
           (error "Diff includes dirty working directory"))
-        (magithub-browse-compare magit-current-range (magit-name-rev "HEAD") anchor))
+        (magithub-browse-compare magit-current-range
+                                 (magithub-name-rev-for-remote "HEAD" "origin")
+                                 anchor))
     (magithub-browse-compare (car magit-current-range) (cdr magit-current-range) anchor)))
 
 (defun magithub-browse-diff (section)
@@ -779,7 +786,8 @@ This must be a hunk from a *magit-diff* buffer."
   "Show the GitHub webpage for the blob at PATH.
 
 If ANCHOR is given, it's used as the anchor in the URL."
-  (magithub-browse-current "blob" (magit-name-rev "HEAD") path :anchor anchor))
+  (magithub-browse-current "blob" (magithub-name-rev-for-remote "HEAD" "origin")
+                           path :anchor anchor))
 
 (defun magithub-browse-item ()
   "Load a GitHub webpage describing the item at point.
@@ -943,7 +951,7 @@ RECIPIENTS should be a list of usernames."
         (url-max-redirections 0) ;; GitHub will try to redirect, but we don't care
         magithub-parse-response)
     (magithub-retrieve (list (magithub-repo-owner) (magithub-repo-name)
-                             "pull_request" (magit-name-rev "HEAD"))
+                             "pull_request" (magithub-name-rev-for-remote "HEAD" "origin"))
                        (lambda (_)
                          (kill-buffer)
                          (message "Your pull request was sent.")))))
