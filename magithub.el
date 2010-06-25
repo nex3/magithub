@@ -713,7 +713,14 @@ If ANCHOR is given, it's used as the anchor in the URL."
   "Show the GitHub webpage comparing refs corresponding to the current diff buffer.
 
 If ANCHOR is given, it's used as the anchor in the URL."
-  (magithub-browse-compare (caar magit-refresh-args) (cdar magit-refresh-args) anchor))
+  (when (and (listp magit-current-range) (null (cdr magit-current-range)))
+    (setq magit-current-range (car magit-current-range)))
+  (if (stringp magit-current-range)
+      (progn
+        (unless (magit-everything-clean-p)
+          (error "Diff includes dirty working directory"))
+        (magithub-browse-compare magit-current-range (magit-name-rev "HEAD") anchor))
+    (magithub-browse-compare (car magit-current-range) (cdr magit-current-range) anchor)))
 
 (defun magithub-browse-diff (section)
   "Show the GitHub webpage for the diff displayed in DIFF-SECTION.
