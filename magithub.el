@@ -174,12 +174,51 @@ the priority is nondeterministic."
   (let ((remote (magithub-remote-for-commit commit)))
     (when remote (magithub-remote-info remote))))
 
+(defun magithub-branches-for-remote (remote)
+  "Return a list of branches in REMOTE, as of the last fetch."
+  (let ((lines (magit-git-lines "remote" "show" "-n" remote)) branches)
+    (while (not (string-match-p "^  Remote branches:" (pop lines)))
+      (unless lines (error "Unknown output from `git remote show'")))
+    (while (string-match "^    \\(.*\\)" (car lines))
+      (push (match-string 1 (pop lines)) branches))
+    branches))
+
 (defun magithub-repo-relative-path ()
   "Return the path to the current file relative to the repository root.
 Only works within `magithub-minor-mode'."
   (let ((filename buffer-file-name))
     (with-current-buffer magithub-status-buffer
       (file-relative-name filename default-directory))))
+
+(defun magithub-name-rev-for-remote (rev remote)
+  "Return a human-readable name for REV that's valid in REMOTE.
+Like `magit-name-rev', but sanitizes things referring to remotes
+and errors out on local-only revs."
+  (setq rev (magit-name-rev rev))
+  (if (and (string-match "^\\(remotes/\\)?\\(.*?\\)/\\(.*\\)" rev)
+           (equal (match-string 2 rev) remote))
+      (match-string 3 rev)
+    (unless (magithub-remote-contains-p remote rev)
+      (error "GitHub repo doesn't know about `%s'" rev))
+    (cond
+     ;; Assume the GitHub repo will have all the same tags as we do,
+     ;; since we can't actually check without performing an HTTP request.
+     ((string-match "^tags/\\(.*\\)" rev) (match-string 1 rev))
+     ((and (not (string-match-p "^remotes/" rev))
+           (member rev (magithub-branches-for-remote remote))
+           (magithub-ref= rev (concat remote "/" rev)))
+      rev)
+     (t (magit-git-string "rev-parse" rev)))))
+
+(defun magithub-remote-contains-p (remote rev)
+  "Return whether REV exists in REMOTE, in any branch.
+This does not fetch origin before determining existence, so it's
+possible that its result is based on stale data."
+  (loop for line in (magit-git-lines "branch" "-r" "--contains" rev)
+        if (and (string-match "^ *\\(.*?\\)/" line)
+                (equal (match-string 1 line) remote))
+          return t
+        finally return nil))
 
 
 ;;; Reading Input
