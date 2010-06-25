@@ -33,6 +33,7 @@ built on top of the Magit interface to Git.
 * New Repositories::
 * Existing Repositories::
 * GitHub Network::
+* GitHub Website::
 @end menu
 
 @node Introduction
@@ -118,5 +119,45 @@ and providing the user's name, and the name of the repository
 if it's different than your repository's name.
 This adds a remote named after the user tracking their fork.
 With a prefix argument, it fetches the remote as well.
+
+@node GitHub Website
+@chapter GitHub Website
+
+Most Magit and Magithub buffers have direct parallels on the GitHub website.
+Magithub makes these all available by typing @kbd{' b}
+(or @kbd{C-c ' b} in non-Magit buffers; @pxref{Other Browsable Buffers}).
+This opens the relevant GitHub page in your browser using @code{browse-url}
+and copies the URL to the kill ring.
+
+@section Browsable Magit Buffers
+
+Typing @kbd{' b} when the point is on a commit
+in a log or status buffer will show that commit on GitHub.
+Otherwise, browsing the Magit status buffer
+will show the main page for the GitHub repo
+on the current HEAD.
+
+Typing @kbd{' b} in a commit buffer will also show that commit on GitHub.
+If the point is on a particular section of the commit diff,
+the browser will open to that section.
+
+Typing @kbd{' b} in a diff buffer will show the corresponding compare page on GitHub.
+Like commits, if the point is on a particular section of the diff,
+the browser will open to that section.
+
+@node Other Browsable Buffers
+@section Other Browsable Buffers
+
+Magithub includes a minor mode that allows it to provide commands
+in buffers for files that are checked in to git.
+Like in Magit buffers, all Magithub commands are under a single namespace.
+In normal files, this is @kbd{C-c '}.
+
+Currently the only command in Magithub minor mode is @code{magithub-browse-file},
+which can be run by typing @kbd{C-c ' b}.
+This opens the current file in the browser,
+to the place where the point is.
+If @code{transient-mark-mode} is active,
+the highlighted region will also be highlighted on the web page.
 
 @bye
