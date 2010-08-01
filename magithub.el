@@ -222,6 +222,10 @@ possible that its result is based on stale data."
           return t
         finally return nil))
 
+(defun magithub-ref= (ref1 ref2)
+  "Return whether REF1 refers to the same commit as REF2."
+  (string= (magit-rev-parse ref1) (magit-rev-parse ref2)))
+
 
 ;;; Reading Input
 
