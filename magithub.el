@@ -922,64 +922,6 @@ prefix arg, clone using SSH."
     (magit-status dir)))
 
 
-;;; Forking Repos
-
-(defun magithub-fork-current ()
-  "Fork the current repository in place."
-  (interactive)
-  (destructuring-bind (owner repo _) (magithub-repo-info)
-    (let ((url-request-method "POST"))
-      (magithub-retrieve (list "repos" "fork" owner repo)
-                         (lambda (obj repo buffer)
-                           (with-current-buffer buffer
-                             (magit-with-refresh
-                               (magit-set (magithub-repo-url
-                                           (car (magithub-auth-info))
-                                           repo 'ssh)
-                                          "remote" "origin" "url")))
-                           (message "Forked %s/%s" owner repo))
-                         (list repo (current-buffer))))))
-
-(defun magithub-send-pull-request (text recipients)
-  "Send a pull request with text TEXT to RECIPIENTS.
-RECIPIENTS should be a list of usernames."
-  (let ((url-request-method "POST")
-        (magithub-request-data (cons (cons "message[body]" text)
-                                     (mapcar (lambda (recipient)
-                                               (cons "message[to][]" recipient))
-                                             recipients)))
-        (magithub-api-base magithub-github-url)
-        (url-max-redirections 0) ;; GitHub will try to redirect, but we don't care
-        magithub-parse-response)
-    (magithub-retrieve (list (magithub-repo-owner) (magithub-repo-name)
-                             "pull_request" (magithub-name-rev-for-remote "HEAD" "origin"))
-                       (lambda (_)
-                         (kill-buffer)
-                         (message "Your pull request was sent.")))))
-
-(defun magithub-pull-request (recipients)
-  "Compose a pull request and send it to RECIPIENTS.
-RECIPIENTS should be a list of usernames.
-
-Interactively, reads RECIPIENTS via `magithub-read-pull-request-recipients'.
-For non-interactive pull requests, see `magithub-send-pull-request'."
-  (interactive (list (magithub-read-pull-request-recipients)))
-  (with-magithub-message-mode
-    (magit-log-edit-set-field
-     'recipients (mapconcat 'identity recipients crm-separator)))
-  (magithub-pop-to-message "send pull request"))
-
-(defun magithub-toggle-ssh (&optional arg)
-  "Toggle whether the current repo is checked out via SSH.
-With ARG, use SSH if and only if ARG is positive."
-  (interactive "P")
-  (if (null arg) (setq arg (if (magithub-repo-ssh-p) -1 1))
-    (setq arg (prefix-numeric-value arg)))
-  (magit-set (magithub-repo-url (magithub-repo-owner) (magithub-repo-name) (> arg 0))
-             "remote" "origin" "url")
-  (magit-refresh-status))
-
-
 ;;; Message Mode
 
 (defvar magithub-message-mode-hook nil "Hook run by `magithub-message-mode'.")
@@ -1051,6 +993,64 @@ printed as a message when the buffer is opened."
   "Abort and erase message being composed."
   (interactive)
   (with-magithub-message-mode (magit-log-edit-cancel-log-message)))
+
+
+;;; Forking Repos
+
+(defun magithub-fork-current ()
+  "Fork the current repository in place."
+  (interactive)
+  (destructuring-bind (owner repo _) (magithub-repo-info)
+    (let ((url-request-method "POST"))
+      (magithub-retrieve (list "repos" "fork" owner repo)
+                         (lambda (obj repo buffer)
+                           (with-current-buffer buffer
+                             (magit-with-refresh
+                               (magit-set (magithub-repo-url
+                                           (car (magithub-auth-info))
+                                           repo 'ssh)
+                                          "remote" "origin" "url")))
+                           (message "Forked %s/%s" owner repo))
+                         (list repo (current-buffer))))))
+
+(defun magithub-send-pull-request (text recipients)
+  "Send a pull request with text TEXT to RECIPIENTS.
+RECIPIENTS should be a list of usernames."
+  (let ((url-request-method "POST")
+        (magithub-request-data (cons (cons "message[body]" text)
+                                     (mapcar (lambda (recipient)
+                                               (cons "message[to][]" recipient))
+                                             recipients)))
+        (magithub-api-base magithub-github-url)
+        (url-max-redirections 0) ;; GitHub will try to redirect, but we don't care
+        magithub-parse-response)
+    (magithub-retrieve (list (magithub-repo-owner) (magithub-repo-name)
+                             "pull_request" (magithub-name-rev-for-remote "HEAD" "origin"))
+                       (lambda (_)
+                         (kill-buffer)
+                         (message "Your pull request was sent.")))))
+
+(defun magithub-pull-request (recipients)
+  "Compose a pull request and send it to RECIPIENTS.
+RECIPIENTS should be a list of usernames.
+
+Interactively, reads RECIPIENTS via `magithub-read-pull-request-recipients'.
+For non-interactive pull requests, see `magithub-send-pull-request'."
+  (interactive (list (magithub-read-pull-request-recipients)))
+  (with-magithub-message-mode
+    (magit-log-edit-set-field
+     'recipients (mapconcat 'identity recipients crm-separator)))
+  (magithub-pop-to-message "send pull request"))
+
+(defun magithub-toggle-ssh (&optional arg)
+  "Toggle whether the current repo is checked out via SSH.
+With ARG, use SSH if and only if ARG is positive."
+  (interactive "P")
+  (if (null arg) (setq arg (if (magithub-repo-ssh-p) -1 1))
+    (setq arg (prefix-numeric-value arg)))
+  (magit-set (magithub-repo-url (magithub-repo-owner) (magithub-repo-name) (> arg 0))
+             "remote" "origin" "url")
+  (magit-refresh-status))
 
 
 ;;; Minor Mode
