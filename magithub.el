@@ -22,6 +22,7 @@
 (require 'magit)
 (require 'url)
 (require 'json)
+(require 'crm)
 (eval-when-compile (require 'cl))
 
 
