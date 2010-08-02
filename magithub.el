@@ -1110,10 +1110,10 @@ See `magithub-try-enabling-minor-mode'."
 
 ;;; Hooks into Magit and Emacs
 
-(defadvice magit-init (after magithub-init-too (dir) activate)
+(defun magithub-magit-init-hook ()
   (when (y-or-n-p "Create GitHub repo? ")
-    (let ((default-directory dir))
-      (call-interactively 'magithub-create-from-local))))
+    (call-interactively 'magithub-create-from-local)))
+(add-hook 'magit-init-hook 'magithub-magit-init-hook)
 
 (defun magithub-magit-mode-hook ()
   "Enable `magithub-minor-mode' in buffers that are now in a Magit repo.
