@@ -200,7 +200,7 @@ and errors out on local-only revs."
            (equal (match-string 2 rev) remote))
       (match-string 3 rev)
     (unless (magithub-remote-contains-p remote rev)
-      (error "Commiy %s hasn't been pushed"
+      (error "Commit %s hasn't been pushed"
              (substring (magit-git-string "rev-parse" rev) 0 8)))
     (cond
      ;; Assume the GitHub repo will have all the same tags as we do,
@@ -212,15 +212,20 @@ and errors out on local-only revs."
       rev)
      (t (magit-git-string "rev-parse" rev)))))
 
-(defun magithub-remote-contains-p (remote rev)
-  "Return whether REV exists in REMOTE, in any branch.
+(defun magithub-remotes-containing-ref (ref)
+  "Return a list of remotes containing REF."
+  (loop with remotes
+        for line in (magit-git-lines "branch" "-r" "--contains" ref)
+        if (and (string-match "^ *\\(.+?\\)/" line)
+                (not (string= (match-string 1 line) (car remotes))))
+           do (push (match-string 1 line) remotes)
+        finally return remotes))
+
+(defun magithub-remote-contains-p (remote ref)
+  "Return whether REF exists in REMOTE, in any branch.
 This does not fetch origin before determining existence, so it's
 possible that its result is based on stale data."
-  (loop for line in (magit-git-lines "branch" "-r" "--contains" rev)
-        if (and (string-match "^ *\\(.*?\\)/" line)
-                (equal (match-string 1 line) remote))
-          return t
-        finally return nil))
+  (member remote (magithub-remotes-containing-ref ref)))
 
 (defun magithub-ref= (ref1 ref2)
   "Return whether REF1 refers to the same commit as REF2."
@@ -748,14 +753,30 @@ This must be a hunk for `magit-currently-shown-commit'."
                                               (magit-current-section)))
              (if l (format "L%d" l) (format "R%d" r))))))
 
+(defun magithub-name-ref-for-compare (ref remote)
+  "Return a human-readable name for REF that's valid in the compare view for REMOTE.
+This is like `magithub-name-rev-for-remote', but takes into
+account comparing across repos.
+
+To avoid making an HTTP request, this method assumes that if REV
+is in a remote, that repo is a GitHub fork."
+  (let ((remotes (magithub-remotes-containing-ref ref)))
+    ;; If remotes is empty, we let magithub-name-rev-for-remote's
+    ;; error-handling deal with it.
+    (if (or (member remote remotes) (null remotes))
+        (magithub-name-rev-for-remote ref remote)
+      (let ((remote-for-ref (car remotes)))
+        (concat remote-for-ref ":"
+                (magithub-name-rev-for-remote ref remote-for-ref))))))
+
 (defun magithub-browse-compare (from to &optional anchor)
   "Show the GitHub webpage comparing refs FROM and TO.
 
 If ANCHOR is given, it's used as the anchor in the URL."
   (magithub-browse-current
    "compare" (format "%s...%s"
-                     (magithub-name-rev-for-remote from "origin")
-                     (magithub-name-rev-for-remote to "origin"))
+                     (magithub-name-ref-for-compare from "origin")
+                     (magithub-name-ref-for-compare to "origin"))
    :anchor anchor))
 
 (defun magithub-browse-diffbuff (&optional anchor)
