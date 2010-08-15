@@ -304,7 +304,7 @@ begin with certain characters."
   (setq hist (or hist 'magithub-repos-history))
   (let ((result (completing-read
                  (or prompt "GitHub repo (user/repo): ")
-                 (magithub--lazy-completion-callback '-magithub-repo-completions)
+                 (magithub--lazy-completion-callback 'magithub--repo-completions)
                  predicate require-match initial-input hist def inherit-input-method)))
     (if (string= result "")
         (when require-match (error "No repository given"))
