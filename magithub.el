@@ -399,7 +399,7 @@ signaled."
   (loop for (name val) on status by 'cddr
         do (when (eq name :error)
              (if (not magithub-handle-errors)
-                 (signal (var val) (cdr val))
+                 (signal (car val) (cdr val))
                (condition-case err
                    (let* ((json-object-type 'plist)
                           (data (json-read))
