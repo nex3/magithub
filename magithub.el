@@ -1140,7 +1140,7 @@ See `magithub-try-enabling-minor-mode'."
   "Enable `magithub-minor-mode' in buffers that are now in a Magit repo.
 If the new `magit-mode' buffer is a status buffer, try enabling
 `magithub-minor-mode' in all buffers."
-  (when (eq magit-submode 'status)
+  (when (derived-mode-p 'magit-status-mode)
     (magithub-try-enabling-minor-mode-everywhere)))
 (add-hook 'magit-mode-hook 'magithub-magit-mode-hook)
 
@@ -1148,7 +1148,7 @@ If the new `magit-mode' buffer is a status buffer, try enabling
   "Clean up `magithub-minor-mode'.
 That is, if the buffer being killed is a Magit status buffer,
 deactivate `magithub-minor-mode' on all buffers in its repository."
-  (when (and (eq major-mode 'magit-mode) (eq magit-submode 'status))
+  (when (and (eq major-mode 'magit-mode) (derived-mode-p 'magit-status-mode))
     (magithub-try-disabling-minor-mode-everywhere)))
 (add-hook 'kill-buffer-hook 'magithub-kill-buffer-hook)
 
