@@ -122,7 +122,11 @@ Return (USERNAME . REPO), or raise an error if the format is
 incorrect."
   (condition-case err
       (destructuring-bind (username repo) (split-string repo "/")
-        (cons username repo))
+        (let ((trim-space
+               (apply-partially 'replace-regexp-in-string
+                                "^ *\\(.*?\\) *$" "\\1")))
+          (cons (funcall trim-space username)
+                (funcall trim-space repo))))
     (wrong-number-of-arguments (error "Invalid GitHub repository %s" repo))))
 
 (defun magithub-repo-url (username repo &optional sshp)
