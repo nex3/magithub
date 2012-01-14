@@ -1130,10 +1130,18 @@ See `magithub-try-enabling-minor-mode'."
   (when (and magithub-minor-mode (buffer-live-p magithub-status-buffer))
     (magithub-minor-mode -1)))
 
-(defun magithub-try-enabling-minor-mode-everywhere ()
-  "Run `magithub-try-enabling-minor-mode' on all buffers."
-  (dolist (buf (buffer-list))
-    (with-current-buffer buf (magithub-try-enabling-minor-mode))))
+(defun magithub-try-enabling-minor-mode-for-repo ()
+  "Run `magithub-try-enabling-minor-mode' on all buffers in the current repo."
+  (let* ((repo-directory (magit-get-top-dir default-directory))
+         (regexp (concat "^" (regexp-quote repo-directory))))
+    (message "Working in %s" repo-directory)
+    (message "Searching with %s" regexp)
+    (when repo-directory
+      (dolist (buf (buffer-list))
+        (with-current-buffer buf
+          (when (and (buffer-file-name)
+                     (string-match-p regexp default-directory))
+            (magithub-try-enabling-minor-mode)))))))
 
 (defun magithub-try-disabling-minor-mode-everywhere ()
   "Run `magithub-try-disabling-minor-mode' on all buffers."
@@ -1155,7 +1163,7 @@ See `magithub-try-enabling-minor-mode'."
 If the new `magit-mode' buffer is a status buffer, try enabling
 `magithub-minor-mode' in all buffers."
   (when (derived-mode-p 'magit-status-mode)
-    (magithub-try-enabling-minor-mode-everywhere)))
+    (magithub-try-enabling-minor-mode-for-repo)))
 (add-hook 'magit-mode-hook 'magithub-magit-mode-hook)
 
 (defun magithub-kill-buffer-hook ()
