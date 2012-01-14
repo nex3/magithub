@@ -25,6 +25,28 @@
 (require 'crm)
 (eval-when-compile (require 'cl))
 
+;;; Customizables
+
+(defcustom magithub-use-ssl nil
+  "If non-nil, access GitHub via HTTPS.
+This is more secure, but slower."
+  :group 'magithub
+  :type 'boolean)
+
+(defcustom magithub-view-gist t
+  "Whether or not to open new Gists in the browser."
+  :group 'magithub
+  :type 'boolean)
+
+(defcustom magithub-message-mode-hook nil
+  "Hook run by `magithub-message-mode'."
+  :group 'magithub
+  :type 'hook)
+
+(defcustom magithub-message-confirm-cancellation magit-log-edit-confirm-cancellation
+  "If non-nil, confirm when cancelling the editing of a `magithub-message-mode' buffer."
+  :group 'magithub
+  :type 'boolean)
 
 ;;; Variables
 
@@ -36,15 +58,8 @@
 
 This is used for some calls that aren't supported by the official API.")
 
-(defvar magithub-use-ssl nil
-  "If non-nil, access GitHub via HTTPS.
-This is more secure, but slower.")
-
 (defvar magithub-gist-url "http://gist.github.com/"
   "The URL for the Gist site.")
-
-(defvar magithub-view-gist t
-  "Whether or not to open new Gists in the browser.")
 
 (defvar magithub-request-data nil
   "An assoc list of parameter names to values.
@@ -952,11 +967,6 @@ prefix arg, clone using SSH."
 
 
 ;;; Message Mode
-
-(defvar magithub-message-mode-hook nil "Hook run by `magithub-message-mode'.")
-
-(defvar magithub-message-confirm-cancellation magit-log-edit-confirm-cancellation
-  "If non-nil, confirm when cancelling the editing of a `magithub-message-mode' buffer.")
 
 (defconst magithub-message-buffer-name "*magithub-edit-message*"
   "Buffer name for composing messages.")
