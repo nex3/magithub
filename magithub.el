@@ -1134,8 +1134,6 @@ See `magithub-try-enabling-minor-mode'."
   "Run `magithub-try-enabling-minor-mode' on all buffers in the current repo."
   (let* ((repo-directory (magit-get-top-dir default-directory))
          (regexp (concat "^" (regexp-quote repo-directory))))
-    (message "Working in %s" repo-directory)
-    (message "Searching with %s" regexp)
     (when repo-directory
       (dolist (buf (buffer-list))
         (with-current-buffer buf
