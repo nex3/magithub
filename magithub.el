@@ -1159,7 +1159,7 @@ See `magithub-try-enabling-minor-mode'."
 (defun magithub-magit-mode-hook ()
   "Enable `magithub-minor-mode' in buffers that are now in a Magit repo.
 If the new `magit-mode' buffer is a status buffer, try enabling
-`magithub-minor-mode' in all buffers."
+`magithub-minor-mode' in all buffers for that repo."
   (when (derived-mode-p 'magit-status-mode)
     (magithub-try-enabling-minor-mode-for-repo)))
 (add-hook 'magit-mode-hook 'magithub-magit-mode-hook)
