@@ -1146,9 +1146,6 @@ See `magithub-try-enabling-minor-mode'."
   (dolist (buf (buffer-list))
     (with-current-buffer buf (magithub-try-disabling-minor-mode))))
 
-(magithub-try-enabling-minor-mode-everywhere)
-
-
 ;;; Hooks into Magit and Emacs
 
 (defun magithub-magit-init-hook ()
@@ -1174,6 +1171,12 @@ deactivate `magithub-minor-mode' on all buffers in its repository."
 
 (add-hook 'find-file-hook 'magithub-try-enabling-minor-mode)
 
+(defun magithub-try-enabling-minor-mode-everywhere ()
+  (dolist (buf (buffer-list))
+    (with-current-buffer buf
+      (magithub-magit-mode-hook))))
+
+(magithub-try-enabling-minor-mode-everywhere)
 
 (provide 'magithub)
 
