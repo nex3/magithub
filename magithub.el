@@ -5,7 +5,7 @@
 
 ;; Author: Nathan Weizenbaum
 ;; URL: http://github.com/nex3/magithub
-;; Version: 0.1
+;; Version: 0.2
 ;; Created: 2010-06-06
 ;; By: Nathan Weizenbaum
 ;; Keywords: git, github, magit
