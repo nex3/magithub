@@ -141,9 +141,9 @@ repo, and SSH is non-nil if it's checked out via SSH."
   (block nil
     (let ((url (magit-get "remote" remote "url")))
       (unless url (return))
-      (when (string-match "\\(?:git\\|https?\\)://github\\.com/\\(.*?\\)/\\(.*\\)\\(\.git\\)?" url)
+      (when (string-match "\\(?:git\\|https?\\)://github\\.com/\\(.*?\\)/\\(.*\\)\\(\\.git\\)?" url)
         (return (list (match-string 1 url) (match-string 2 url) nil)))
-      (when (string-match "git@github\\.com:\\(.*?\\)/\\(.*\\)\\.git" url)
+      (when (string-match "git@github\\.com:\\(.*?\\)/\\(.*\\)\\(\\.git\\)?" url)
         (return (list (match-string 1 url) (match-string 2 url) t)))
       (return))))
 
