@@ -25,6 +25,28 @@
 (require 'crm)
 (eval-when-compile (require 'cl))
 
+;;; Customizables
+
+(defcustom magithub-use-ssl nil
+  "If non-nil, access GitHub via HTTPS.
+This is more secure, but slower."
+  :group 'magithub
+  :type 'boolean)
+
+(defcustom magithub-view-gist t
+  "Whether or not to open new Gists in the browser."
+  :group 'magithub
+  :type 'boolean)
+
+(defcustom magithub-message-mode-hook nil
+  "Hook run by `magithub-message-mode'."
+  :group 'magithub
+  :type 'hook)
+
+(defcustom magithub-message-confirm-cancellation magit-log-edit-confirm-cancellation
+  "If non-nil, confirm when cancelling the editing of a `magithub-message-mode' buffer."
+  :group 'magithub
+  :type 'boolean)
 
 ;;; Variables
 
@@ -36,15 +58,8 @@
 
 This is used for some calls that aren't supported by the official API.")
 
-(defvar magithub-use-ssl nil
-  "If non-nil, access GitHub via HTTPS.
-This is more secure, but slower.")
-
 (defvar magithub-gist-url "http://gist.github.com/"
   "The URL for the Gist site.")
-
-(defvar magithub-view-gist t
-  "Whether or not to open new Gists in the browser.")
 
 (defvar magithub-request-data nil
   "An assoc list of parameter names to values.
@@ -122,7 +137,11 @@ Return (USERNAME . REPO), or raise an error if the format is
 incorrect."
   (condition-case err
       (destructuring-bind (username repo) (split-string repo "/")
-        (cons username repo))
+        (let ((trim-space
+               (apply-partially 'replace-regexp-in-string
+                                "^ *\\(.*?\\) *$" "\\1")))
+          (cons (funcall trim-space username)
+                (funcall trim-space repo))))
     (wrong-number-of-arguments (error "Invalid GitHub repository %s" repo))))
 
 (defun magithub-repo-url (username repo &optional sshp)
@@ -949,11 +968,6 @@ prefix arg, clone using SSH."
 
 ;;; Message Mode
 
-(defvar magithub-message-mode-hook nil "Hook run by `magithub-message-mode'.")
-
-(defvar magithub-message-confirm-cancellation magit-log-edit-confirm-cancellation
-  "If non-nil, confirm when cancelling the editing of a `magithub-message-mode' buffer.")
-
 (defconst magithub-message-buffer-name "*magithub-edit-message*"
   "Buffer name for composing messages.")
 
@@ -1116,18 +1130,21 @@ See `magithub-try-enabling-minor-mode'."
   (when (and magithub-minor-mode (buffer-live-p magithub-status-buffer))
     (magithub-minor-mode -1)))
 
-(defun magithub-try-enabling-minor-mode-everywhere ()
-  "Run `magithub-try-enabling-minor-mode' on all buffers."
-  (dolist (buf (buffer-list))
-    (with-current-buffer buf (magithub-try-enabling-minor-mode))))
+(defun magithub-try-enabling-minor-mode-for-repo ()
+  "Run `magithub-try-enabling-minor-mode' on all buffers in the current repo."
+  (let* ((repo-directory (magit-get-top-dir default-directory))
+         (regexp (concat "^" (regexp-quote repo-directory))))
+    (when repo-directory
+      (dolist (buf (buffer-list))
+        (with-current-buffer buf
+          (when (and (buffer-file-name)
+                     (string-match-p regexp default-directory))
+            (magithub-try-enabling-minor-mode)))))))
 
 (defun magithub-try-disabling-minor-mode-everywhere ()
   "Run `magithub-try-disabling-minor-mode' on all buffers."
   (dolist (buf (buffer-list))
     (with-current-buffer buf (magithub-try-disabling-minor-mode))))
-
-(magithub-try-enabling-minor-mode-everywhere)
-
 
 ;;; Hooks into Magit and Emacs
 
@@ -1139,9 +1156,9 @@ See `magithub-try-enabling-minor-mode'."
 (defun magithub-magit-mode-hook ()
   "Enable `magithub-minor-mode' in buffers that are now in a Magit repo.
 If the new `magit-mode' buffer is a status buffer, try enabling
-`magithub-minor-mode' in all buffers."
+`magithub-minor-mode' in all buffers for that repo."
   (when (derived-mode-p 'magit-status-mode)
-    (magithub-try-enabling-minor-mode-everywhere)))
+    (magithub-try-enabling-minor-mode-for-repo)))
 (add-hook 'magit-mode-hook 'magithub-magit-mode-hook)
 
 (defun magithub-kill-buffer-hook ()
@@ -1154,6 +1171,12 @@ deactivate `magithub-minor-mode' on all buffers in its repository."
 
 (add-hook 'find-file-hook 'magithub-try-enabling-minor-mode)
 
+(defun magithub-try-enabling-minor-mode-everywhere ()
+  (dolist (buf (buffer-list))
+    (with-current-buffer buf
+      (magithub-magit-mode-hook))))
+
+(magithub-try-enabling-minor-mode-everywhere)
 
 (provide 'magithub)
 
