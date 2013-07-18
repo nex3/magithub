@@ -1133,8 +1133,9 @@ See `magithub-try-enabling-minor-mode'."
 (defun magithub-try-enabling-minor-mode-for-repo ()
   "Run `magithub-try-enabling-minor-mode' on all buffers in the current repo."
   (let* ((repo-directory (magit-get-top-dir default-directory))
-         (regexp (concat "^" (regexp-quote repo-directory))))
+         regexp)
     (when repo-directory
+      (setq regexp (concat "^" (regexp-quote repo-directory)))
       (dolist (buf (buffer-list))
         (with-current-buffer buf
           (when (and (buffer-file-name)
