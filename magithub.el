@@ -43,7 +43,7 @@ This is more secure, but slower."
   :group 'magithub
   :type 'hook)
 
-(defcustom magithub-message-confirm-cancellation magit-log-edit-confirm-cancellation
+(defcustom magithub-message-confirm-cancellation t
   "If non-nil, confirm when cancelling the editing of a `magithub-message-mode' buffer."
   :group 'magithub
   :type 'boolean)
